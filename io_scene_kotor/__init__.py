@@ -48,6 +48,7 @@ from .ops.rebuildarmature import KB_OT_rebuild_armature
 from .ops.rebuildmaterial import KB_OT_rebuild_material
 from .ops.renderminimap import KB_OT_render_minimap_auto, KB_OT_render_minimap_manual
 from .ops.showhideobjects import (
+    KB_OT_hide_blockers,
     KB_OT_hide_untextured,
     KB_OT_hide_char_bones,
     KB_OT_hide_char_dummies,
@@ -55,6 +56,7 @@ from .ops.showhideobjects import (
     KB_OT_hide_lights,
     KB_OT_hide_unlightmapped,
     KB_OT_hide_walkmeshes,
+    KB_OT_show_blockers,
     KB_OT_show_untextured,
     KB_OT_show_char_bones,
     KB_OT_show_char_dummies,
@@ -169,6 +171,7 @@ classes = (
     KB_OT_export_lyt,
     KB_OT_export_mdl,
     KB_OT_export_pth,
+    KB_OT_hide_blockers,
     KB_OT_hide_untextured,
     KB_OT_hide_char_bones,
     KB_OT_hide_char_dummies,
@@ -188,6 +191,7 @@ classes = (
     KB_OT_rebuild_material,
     KB_OT_render_minimap_auto,
     KB_OT_render_minimap_manual,
+    KB_OT_show_blockers,
     KB_OT_show_untextured,
     KB_OT_show_char_bones,
     KB_OT_show_char_dummies,

@@ -48,6 +48,7 @@ class KB_MT_kotor_showhide(Menu):
         layout.operator("kb.show_unlightmapped", icon="IMAGE_ALPHA")
         layout.operator("kb.show_lights", icon="OUTLINER_OB_LIGHT")
         layout.operator("kb.show_emitters", icon="PARTICLES")
+        layout.operator("kb.show_blockers", icon="FULLSCREEN_EXIT")
         layout.operator("kb.show_char_bones", icon="BONE_DATA")
         layout.operator("kb.show_char_dummies", icon="OUTLINER_OB_EMPTY")
         layout.separator()
@@ -56,6 +57,7 @@ class KB_MT_kotor_showhide(Menu):
         layout.operator("kb.hide_unlightmapped", icon="IMAGE_ALPHA")
         layout.operator("kb.hide_lights", icon="OUTLINER_OB_LIGHT")
         layout.operator("kb.hide_emitters", icon="PARTICLES")
+        layout.operator("kb.hide_blockers", icon="FULLSCREEN_EXIT")
         layout.operator("kb.hide_char_bones", icon="BONE_DATA")
         layout.operator("kb.hide_char_dummies", icon="OUTLINER_OB_EMPTY")
 
