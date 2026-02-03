@@ -191,10 +191,12 @@ class AnimationNode:
                 )
                 if not anim_data.action_slot:
                     anim_data.action_slot = action_slot
+            else:
+                action_slot = None
 
             data_path = prop.data_path
             fcurves = [
-                AnimationNode.get_or_create_fcurve(action, data_path, i)
+                AnimationNode.get_or_create_fcurve(action, data_path, i, action_slot)
                 for i in range(prop.bl_dim)
             ]
             keyframe_points = [fcurve.keyframe_points for fcurve in fcurves]
@@ -285,11 +287,20 @@ class AnimationNode:
             return subject.animation_data_create()
 
     @classmethod
-    def get_or_create_fcurve(cls, action, data_path, index):
-        fcurve = action.fcurves.find(data_path, index=index)
-        if not fcurve:
-            fcurve = action.fcurves.new(data_path=data_path, index=index)
-        return fcurve
+    def get_or_create_fcurve(cls, action, data_path, index, action_slot=None):
+        if bpy.app.version >= (5, 0) and action_slot:
+            channelbag = bpy.utils.anim.action_ensure_channelbag_for_slot(
+                action, action_slot
+            )
+            fcurve = channelbag.fcurves.find(data_path, index=index)
+            if not fcurve:
+                fcurve = channelbag.fcurves.new(data_path=data_path, index=index)
+            return fcurve
+        else:
+            fcurve = action.fcurves.find(data_path, index=index)
+            if not fcurve:
+                fcurve = action.fcurves.new(data_path=data_path, index=index)
+            return fcurve
 
     def load_keyframes_from_object(self, anim, anim_subject):
         anim_data = anim_subject.animation_data
@@ -300,7 +311,13 @@ class AnimationNode:
         if not action:
             return
 
-        keyframes = self.get_keyframes(action, anim.frame_start, anim.frame_end)
+        action_slot = None
+        if bpy.app.version >= (4, 4) and anim_data.action_slot:
+            action_slot = anim_data.action_slot
+
+        keyframes = self.get_keyframes(
+            action, anim.frame_start, anim.frame_end, action_slot=action_slot
+        )
         nested_keyframes = self.nest_keyframes(keyframes)
 
         for data_path, dp_keyframes in nested_keyframes.items():
@@ -334,9 +351,19 @@ class AnimationNode:
                 self.keyframes[label].append([time] + values)
 
     @classmethod
-    def get_keyframes(cls, action, frame_start=0, frame_end=sys.maxsize, dp_prefix=""):
+    def get_keyframes(
+        cls, action, frame_start=0, frame_end=sys.maxsize, dp_prefix="", action_slot=None
+    ):
         keyframes = dict()
-        for fcurve in action.fcurves:
+        if bpy.app.version >= (5, 0) and action_slot:
+            channelbag = bpy.utils.anim.action_ensure_channelbag_for_slot(
+                action, action_slot
+            )
+            fcurves = channelbag.fcurves
+        else:
+            fcurves = action.fcurves
+
+        for fcurve in fcurves:
             data_path = fcurve.data_path
             if dp_prefix and data_path.startswith(dp_prefix):
                 prefix_len = len(dp_prefix)
