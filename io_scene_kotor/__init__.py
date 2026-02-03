@@ -107,7 +107,7 @@ from .ui.props.scene import ScenePropertyGroup
 bl_info = {
     "name": "KotorBlender",
     "author": "seedhartha",
-    "version": (4, 0, 3),
+    "version": (4, 0, 4),
     "blender": (3, 6),
     "location": "File > Import-Export, Object Properties",
     "description": "Import, edit and export KotOR models",
