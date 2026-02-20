@@ -19,6 +19,7 @@
 import sys
 
 import bpy
+from bpy_extras import anim_utils
 
 from ..constants import NodeType, ANIM_REST_POSE_OFFSET
 from ..utils import time_to_frame, frame_to_time, is_close
@@ -289,7 +290,7 @@ class AnimationNode:
     @classmethod
     def get_or_create_fcurve(cls, action, data_path, index, action_slot=None):
         if bpy.app.version >= (5, 0) and action_slot:
-            channelbag = bpy.utils.anim.action_ensure_channelbag_for_slot(
+            channelbag = anim_utils.action_ensure_channelbag_for_slot(
                 action, action_slot
             )
             fcurve = channelbag.fcurves.find(data_path, index=index)
@@ -356,7 +357,7 @@ class AnimationNode:
     ):
         keyframes = dict()
         if bpy.app.version >= (5, 0) and action_slot:
-            channelbag = bpy.utils.anim.action_ensure_channelbag_for_slot(
+            channelbag = anim_utils.action_ensure_channelbag_for_slot(
                 action, action_slot
             )
             fcurves = channelbag.fcurves
