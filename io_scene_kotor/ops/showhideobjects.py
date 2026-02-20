@@ -26,6 +26,7 @@ from ..utils import (
     is_char_bone,
     is_mesh_type,
     is_aabb_mesh,
+    is_skin_mesh,
 )
 
 
@@ -109,6 +110,28 @@ class KB_OT_hide_emitters(bpy.types.Operator):
 
         for obj in bpy.context.scene.objects:
             if is_mesh_type(obj, MeshType.EMITTER):
+                obj.hide_viewport = True
+                obj.hide_render = True
+
+        return {"FINISHED"}
+
+
+class KB_OT_hide_blockers(bpy.types.Operator):
+    bl_idname = "kb.hide_blockers"
+    bl_label = "Hide Blockers"
+    bl_description = "Hides all untextured blocker trimeshes in the scene"
+
+    def execute(self, context):
+        bpy.ops.object.select_all(action="DESELECT")
+
+        for obj in bpy.context.scene.objects:
+            if (
+                is_mesh_type(obj, MeshType.TRIMESH)
+                and not is_skin_mesh(obj)
+                and obj.kb.render == 1
+                and is_null(obj.kb.bitmap)
+                and is_null(obj.kb.bitmap2)
+            ):
                 obj.hide_viewport = True
                 obj.hide_render = True
 
@@ -227,6 +250,28 @@ class KB_OT_show_emitters(bpy.types.Operator):
 
         for obj in bpy.context.scene.objects:
             if is_mesh_type(obj, MeshType.EMITTER):
+                obj.hide_viewport = False
+                obj.hide_render = False
+
+        return {"FINISHED"}
+
+
+class KB_OT_show_blockers(bpy.types.Operator):
+    bl_idname = "kb.show_blockers"
+    bl_label = "Show Blockers"
+    bl_description = "Reveals all untextured blocker trimeshes in the scene"
+
+    def execute(self, context):
+        bpy.ops.object.select_all(action="DESELECT")
+
+        for obj in bpy.context.scene.objects:
+            if (
+                is_mesh_type(obj, MeshType.TRIMESH)
+                and not is_skin_mesh(obj)
+                and obj.kb.render == 1
+                and is_null(obj.kb.bitmap)
+                and is_null(obj.kb.bitmap2)
+            ):
                 obj.hide_viewport = False
                 obj.hide_render = False
 
