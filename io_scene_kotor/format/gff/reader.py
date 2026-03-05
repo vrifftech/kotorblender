@@ -162,5 +162,5 @@ class GffReader:
         return KeyValue(label, data)
 
     def repack_int_to_float(self, val):
-        packed = pack("i", val)
+        packed = pack("I", val)
         return unpack("f", packed)[0]
