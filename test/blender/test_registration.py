@@ -10,6 +10,7 @@ Run with:
 
 import os
 import sys
+from typing import Callable
 
 import bpy
 
@@ -139,7 +140,7 @@ def test_property_groups():
 
 def test_operators_registered():
     """All 43 kb.* operators are accessible via bpy.ops."""
-    failed = []
+    failed: list[str] = []
     for op_id in EXPECTED_OPERATORS:
         cat, name = op_id.split(".", 1)
         ops_cat = getattr(bpy.ops, cat, None)
@@ -154,7 +155,7 @@ def test_operators_registered():
 
 def test_panels_registered():
     """All KB_PT_* panel types are registered in bpy.types."""
-    failed = [p for p in EXPECTED_PANELS if not hasattr(bpy.types, p)]
+    failed: list[str] = [p for p in EXPECTED_PANELS if not hasattr(bpy.types, p)]
     if failed:
         print(f"  FAIL test_panels_registered: missing {failed}")
         return False
@@ -164,7 +165,7 @@ def test_panels_registered():
 
 def test_menus_registered():
     """All KB_MT_* menu types are registered in bpy.types."""
-    failed = [m for m in EXPECTED_MENUS if not hasattr(bpy.types, m)]
+    failed: list[str] = [m for m in EXPECTED_MENUS if not hasattr(bpy.types, m)]
     if failed:
         print(f"  FAIL test_menus_registered: missing {failed}")
         return False
@@ -174,7 +175,7 @@ def test_menus_registered():
 
 def test_ui_lists_registered():
     """All KB_UL_* UIList types are registered in bpy.types."""
-    failed = [u for u in EXPECTED_LISTS if not hasattr(bpy.types, u)]
+    failed: list[str] = [u for u in EXPECTED_LISTS if not hasattr(bpy.types, u)]
     if failed:
         print(f"  FAIL test_ui_lists_registered: missing {failed}")
         return False
@@ -259,20 +260,20 @@ def test_addon_preferences():
 def test_operator_poll_contexts():
     """Operators whose poll can run in background mode don't crash."""
     # These should not crash even in background mode (they may return CANCELLED)
-    safe_ops = [
+    safe_ops: list[tuple[str, str]] = [
         ("kb", "hide_walkmeshes"),
         ("kb", "hide_lights"),
         ("kb", "hide_emitters"),
         ("kb", "show_walkmeshes"),
         ("kb", "show_lights"),
     ]
-    failed = []
+    failed: list[str] = []
     for cat, name in safe_ops:
         try:
             op = getattr(getattr(bpy.ops, cat), name)
             op()  # result may be CANCELLED – that's fine
         except Exception as e:
-            failed.append(f"{cat}.{name}: {e}")
+            failed.append(f"{cat}.{name}: {e.__class__.__name__}: {e}")
     if failed:
         print(f"  FAIL test_operator_poll_contexts: {failed}")
         return False
@@ -287,7 +288,7 @@ def test_operator_poll_contexts():
 
 def run_tests():
     print("\n=== test_registration.py ===")
-    tests = [
+    tests: list[Callable[[], bool]] = [
         test_property_groups,
         test_operators_registered,
         test_panels_registered,
@@ -299,10 +300,10 @@ def run_tests():
         test_addon_preferences,
         test_operator_poll_contexts,
     ]
-    results = [t() for t in tests]
-    passed = sum(results)
-    total = len(results)
-    status = "OK" if all(results) else "FAIL"
+    results: list[bool] = [t() for t in tests]
+    passed: int = sum(results)
+    total: int = len(results)
+    status: str = "OK" if all(results) else "FAIL"
     print(f"\n[{status}] {passed}/{total} passed in test_registration.py\n")
     return all(results)
 

@@ -165,12 +165,22 @@ class BwmWriter:
                 self.old_to_new_vert_idx[vert_idx] = num_verts
                 self.verts.append(vert)
 
-        # Offset by node and LYT position
+        # Bake to MDL-root / walkmesh-root space (same as MDL: from_root @ local vert).
+        # Header position is written as (0,0,0); reader stores verts as-is in mesh data.
+        M = self.geom_node.from_root
         for vert_idx, vert in enumerate(self.verts):
-            self.verts[vert_idx] = [
-                vert[i] + self.geom_node.position[i] + self.geom_node.lytposition[i]
-                for i in range(3)
-            ]
+            w = M @ Vector(vert)
+            self.verts[vert_idx] = [w.x, w.y, w.z]
+
+    def _mesh_normal_to_baked_space(self, normal):
+        """Face normal in mesh space -> normal for baked (from_root) vertex positions."""
+        lin = self.geom_node.from_root.to_3x3()
+        try:
+            inv_t = lin.inverted().transposed()
+        except ValueError:
+            inv_t = lin
+        nw = (inv_t @ Vector(normal)).normalized()
+        return [nw.x, nw.y, nw.z]
 
     def peek_faces(self):
         walkable_face_indices = []
@@ -191,7 +201,9 @@ class BwmWriter:
                 ]
             )
             self.facelist.materials.append(self.geom_node.facelist.materials[face_idx])
-            self.facelist.normals.append(self.geom_node.facelist.normals[face_idx])
+            self.facelist.normals.append(
+                self._mesh_normal_to_baked_space(self.geom_node.facelist.normals[face_idx])
+            )
 
     def peek_aabbs(self):
         if self.bwm_type == BWM_TYPE_PWK_DWK:
@@ -308,11 +320,22 @@ class BwmWriter:
     def save_header(self):
         rel_use_vec1 = self.use_node1.position if self.use_node1 else [0.0] * 3
         rel_use_vec2 = self.use_node2.position if self.use_node2 else [0.0] * 3
-        position = self.geom_node.position
+        # Vertices are stored in baked root space; pivot in file is origin.
+        position = (0.0, 0.0, 0.0)
 
         if self.walkmesh.walkmesh_type == WalkmeshType.DWK:
-            abs_use_vec1 = [position[i] + rel_use_vec1[i] for i in range(3)]
-            abs_use_vec2 = [position[i] + rel_use_vec2[i] for i in range(3)]
+            o1 = (
+                (self.use_node1.from_root @ Vector((0.0, 0.0, 0.0)))
+                if self.use_node1
+                else Vector((0.0, 0.0, 0.0))
+            )
+            o2 = (
+                (self.use_node2.from_root @ Vector((0.0, 0.0, 0.0)))
+                if self.use_node2
+                else Vector((0.0, 0.0, 0.0))
+            )
+            abs_use_vec1 = [o1.x, o1.y, o1.z]
+            abs_use_vec2 = [o2.x, o2.y, o2.z]
         else:
             abs_use_vec1 = [0.0] * 3
             abs_use_vec2 = [0.0] * 3

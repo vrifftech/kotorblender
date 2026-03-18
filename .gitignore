@@ -106,3 +106,5 @@ venv.bak/
 .vscode/
 
 test/out/
+test/blender/test_bwm_walkmesh_transform.py
+.history/

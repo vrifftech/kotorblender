@@ -24,19 +24,22 @@ from ...scene.walkmesh import Walkmesh
 
 from ..binreader import BinaryReader
 
-from .types import *
+from .types import *  # noqa: F403
 
 
 class BwmReader:
-    def __init__(self, path, model_name):
-        self.path = path
-        self.model_name = model_name
-        self.bwm = BinaryReader(path, "little")
+    def __init__(self, path: str, model_name: str):
+        self.path: str = path
+        self.model_name: str = model_name
+        self.bwm: BinaryReader = BinaryReader(path, "little")
 
-        self.position = [0.0] * 3
-        self.verts = []
-        self.facelist = FaceList()
-        self.outer_edges = []
+        self.position: list[float] = [0.0] * 3
+        self.verts: list[list[float]] = []
+        self.facelist: FaceList = FaceList()
+        self.outer_edges: list[tuple[int, int]] = []
+        self.bwm_type: int = 0
+        self.rel_use_vec1: list[float] = [0.0] * 3
+        self.rel_use_vec2: list[float] = [0.0] * 3
 
     def load(self):
         self.load_header()
@@ -50,7 +53,7 @@ class BwmReader:
         return self.new_walkmesh()
 
     def load_header(self):
-        file_type = self.bwm.read_string(4)
+        file_type: str = self.bwm.read_string(4)
         if file_type != "BWM ":
             raise RuntimeError(
                 "BWM file type is invalid: expected='BWM ', actual='{}'".format(
@@ -58,12 +61,12 @@ class BwmReader:
                 )
             )
 
-        version = self.bwm.read_string(4)
+        _version = self.bwm.read_string(4)
         self.bwm_type = self.bwm.read_uint32()
         self.rel_use_vec1 = [self.bwm.read_float() for _ in range(3)]
         self.rel_use_vec2 = [self.bwm.read_float() for _ in range(3)]
-        abs_use_vec1 = [self.bwm.read_float() for _ in range(3)]
-        abs_use_vec2 = [self.bwm.read_float() for _ in range(3)]
+        _abs_use_vec1 = [self.bwm.read_float() for _ in range(3)]
+        _abs_use_vec2 = [self.bwm.read_float() for _ in range(3)]
         self.position = [self.bwm.read_float() for _ in range(3)]
         self.num_verts = self.bwm.read_uint32()
         self.off_verts = self.bwm.read_uint32()
@@ -89,22 +92,22 @@ class BwmReader:
             self.verts.append(vert)
 
     def load_faces(self):
-        vert_indices = []
+        vert_indices: list[list[int]] = []
         self.bwm.seek(self.off_vert_indices)
         for _ in range(self.num_faces):
             vert_indices.append([self.bwm.read_uint32() for _ in range(3)])
 
         self.bwm.seek(self.off_material_ids)
-        material_ids = [self.bwm.read_uint32() for _ in range(self.num_faces)]
+        material_ids: list[int] = [self.bwm.read_uint32() for _ in range(self.num_faces)]
 
-        normals = []
+        normals: list[list[float]] = []
         self.bwm.seek(self.off_normals)
         for _ in range(self.num_faces):
             normal = [self.bwm.read_float() for _ in range(3)]
             normals.append(normal)
 
         self.bwm.seek(self.off_distances)
-        distances = [self.bwm.read_float() for _ in range(self.num_faces)]
+        distances: list[float] = [self.bwm.read_float() for _ in range(self.num_faces)]
 
         for i in range(self.num_faces):
             self.facelist.vertices.append(vert_indices[i])
@@ -112,7 +115,7 @@ class BwmReader:
             self.facelist.materials.append(material_ids[i])
 
     def load_aabbs(self):
-        aabbs = []
+        aabbs: list[AABB] = []  # noqa: F405
         self.bwm.seek(self.off_aabbs)
         for _ in range(self.num_aabbs):
             bounding_box = [self.bwm.read_float() for _ in range(6)]
@@ -122,7 +125,7 @@ class BwmReader:
             child_idx1 = self.bwm.read_uint32()
             child_idx2 = self.bwm.read_uint32()
             aabbs.append(
-                AABB(
+                AABB(  # noqa: F405
                     bounding_box,
                     face_idx,
                     most_significant_plane,
@@ -132,7 +135,7 @@ class BwmReader:
             )
 
     def load_adjacent_edges(self):
-        adj_edges = []
+        adj_edges: list[list[int]] = []
         self.bwm.seek(self.off_adj_edges)
         for _ in range(self.num_adj_edges):
             adj_edges.append([self.bwm.read_int32() for _ in range(3)])
@@ -148,21 +151,21 @@ class BwmReader:
         self.bwm.seek(self.off_perimeters)
         self.perimeters = [self.bwm.read_uint32() for _ in range(self.num_perimeters)]
 
-    def new_walkmesh(self):
-        if self.bwm_type == BWM_TYPE_WOK:
+    def new_walkmesh(self) -> Walkmesh:
+        if self.bwm_type == BWM_TYPE_WOK:  # noqa: F405
             return self.new_area_walkmesh()
-        elif self.bwm_type == BWM_TYPE_PWK_DWK:
+        elif self.bwm_type == BWM_TYPE_PWK_DWK:  # noqa: F405
             return self.new_placeable_walkmesh()
         else:
             raise RuntimeError("Unsupported walkmesh type: " + str(self.bwm_type))
 
-    def new_area_walkmesh(self):
+    def new_area_walkmesh(self) -> Walkmesh:
         root_node = DummyNode("{}_wok".format(self.model_name))
 
         geom_node = AabbNode("{}_wok_wg".format(self.model_name))
         geom_node.roottype = RootType.WALKMESH
         geom_node.position = self.position
-        geom_node.parent = root_node
+        geom_node.parent = root_node  # pyright: ignore[reportAttributeAccessIssue]
         geom_node.verts = self.verts
         geom_node.facelist = self.facelist
         geom_node.roomlinks = {
@@ -174,13 +177,15 @@ class BwmReader:
         root_node.children.append(geom_node)
 
         walkmesh = Walkmesh(WalkmeshType.WOK)
-        walkmesh.root_node = root_node
+        walkmesh.root_node = root_node  # pyright: ignore[reportAttributeAccessIssue]
 
         return walkmesh
 
-    def new_placeable_walkmesh(self):
+    def new_placeable_walkmesh(self) -> Walkmesh:
         walkmesh_type = (
-            WalkmeshType.DWK if self.path.endswith("dwk") else WalkmeshType.PWK
+            WalkmeshType.DWK
+            if self.path.endswith("dwk")
+            else WalkmeshType.PWK
         )
         if walkmesh_type == WalkmeshType.DWK:
             if self.path.endswith("1.dwk"):
@@ -209,25 +214,25 @@ class BwmReader:
         geom_node = AabbNode(geom_name)
         geom_node.roottype = RootType.WALKMESH
         geom_node.position = self.position
-        geom_node.parent = root_node
+        geom_node.parent = root_node  # pyright: ignore[reportAttributeAccessIssue]
         geom_node.verts = self.verts
         geom_node.facelist = self.facelist
 
         use_node1 = DummyNode(use_name1)
         use_node1.dummytype = DummyType.USE1
         use_node1.position = self.rel_use_vec1
-        use_node1.parent = root_node
+        use_node1.parent = root_node  # pyright: ignore[reportAttributeAccessIssue]
 
         use_node2 = DummyNode(use_name2)
         use_node2.dummytype = DummyType.USE2
         use_node2.position = self.rel_use_vec2
-        use_node2.parent = root_node
+        use_node2.parent = root_node  # pyright: ignore[reportAttributeAccessIssue]
 
         root_node.children.append(geom_node)
         root_node.children.append(use_node1)
         root_node.children.append(use_node2)
 
         walkmesh = Walkmesh(walkmesh_type)
-        walkmesh.root_node = root_node
+        walkmesh.root_node = root_node  # pyright: ignore[reportAttributeAccessIssue]
 
         return walkmesh
