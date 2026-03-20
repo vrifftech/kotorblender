@@ -69,11 +69,13 @@ class KB_OT_import_mdl(bpy.types.Operator, ImportHelper):
 
         preferences = context.preferences
         addon_preferences = preferences.addons[PACKAGE_NAME].preferences
+        working_dir = os.path.dirname(self.filepath)
+        # Coerce to str: Blender 5.x can expose addon prefs as _PropertyDeferred
         options.texture_search_paths = semicolon_separated_to_absolute_paths(
-            addon_preferences.texture_search_paths, os.path.dirname(self.filepath)
+            str(addon_preferences.texture_search_paths), working_dir
         )
         options.lightmap_search_paths = semicolon_separated_to_absolute_paths(
-            addon_preferences.lightmap_search_paths, os.path.dirname(self.filepath)
+            str(addon_preferences.lightmap_search_paths), working_dir
         )
 
         try:

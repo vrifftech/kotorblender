@@ -1,4 +1,4 @@
-﻿# ##### BEGIN GPL LICENSE BLOCK #####
+# ##### BEGIN GPL LICENSE BLOCK #####
 #
 #  This program is free software; you can redistribute it and/or
 #  modify it under the terms of the GNU General Public License
@@ -19,7 +19,7 @@
 import logging
 import os
 
-from .constants import *
+from .constants import *  # noqa: F403
 
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.INFO)
@@ -166,12 +166,17 @@ def int_to_hex(val):
     return "{:02X}".format(val)
 
 
-def semicolon_separated_to_absolute_paths(paths_str, working_dir):
-    abs_paths = []
-    rel_paths = paths_str.split(";")
+def semicolon_separated_to_absolute_paths(paths_str: "str | _PropertyDeferred", working_dir: str) -> list[str]:
+    """Convert semicolon-separated path string to list of absolute paths. paths_str is coerced to str for Blender addon preference values."""
+    if not isinstance(paths_str, str):
+        paths_str = str(paths_str)
+    abs_paths: list[str] = []
+    rel_paths: list[str] = paths_str.split(";")
     for rel_path in rel_paths:
         abs_path = (
-            rel_path if os.path.isabs(rel_path) else os.path.join(working_dir, rel_path)
+            rel_path
+            if os.path.isabs(rel_path)
+            else os.path.join(working_dir, rel_path)
         )
         abs_paths.append(abs_path)
     if working_dir not in abs_paths:
