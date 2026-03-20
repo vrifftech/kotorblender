@@ -16,6 +16,8 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
+import math
+
 import bpy
 
 from bpy_extras.io_utils import unpack_list
@@ -73,10 +75,15 @@ class EdgeLoopMesh:
         return len(self.verts)
 
 
+def _quantize(val: float) -> int:
+    """Quantize float for hashing; treat NaN as 0."""
+    return 0 if math.isnan(val) else int(val * 10000)
+
+
 class SimilarMdlVertex:
     def __init__(self, coords):
         self.coords = coords
-        self.value = tuple(int(val * 10000) for val in self.coords)
+        self.value = tuple(_quantize(val) for val in self.coords)
 
     def __hash__(self):
         return hash(self.value)
@@ -92,7 +99,7 @@ class SimilarEdgeLoopMeshVertex:
         self.uv1 = uv1
         self.uv2 = uv2
         self.value = tuple(
-            int(val * 10000)
+            _quantize(val)
             for val in (*self.coords, *self.normal, *self.uv1, *self.uv2)
         )
 

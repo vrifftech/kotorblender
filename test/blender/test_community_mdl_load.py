@@ -196,7 +196,8 @@ def test_fixed_mdl_roundtrip_each() -> bool:
             load_mdl(_op, mdl_path, opts)
             roots = [o for o in bpy.data.objects if getattr(o, "kb", None) and o.kb.dummytype == DummyType.MDLROOT]  # pyright: ignore[reportAttributeAccessIssue]
             if not roots:
-                print(f"  SKIP test_fixed_mdl_roundtrip_each ({name}): no root")
+                print(f"  FAIL test_fixed_mdl_roundtrip_each ({name}): no root after load")
+                all_ok = False
                 continue
             name_before = roots[0].name
             with tempfile.NamedTemporaryFile(suffix=".mdl", delete=False) as f:

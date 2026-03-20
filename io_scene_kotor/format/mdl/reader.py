@@ -494,6 +494,7 @@ class MdlReader:
                 self.mdl.seek(MDL_OFFSET + tex_name_offset)
                 node.flare_list.textures.append(self.mdl.read_c_string())  # pyright: ignore[reportAttributeAccessIssue]
 
+        node_by_bone: dict[int, int] = dict()
         if type_flags & NODE_SKIN:
             if num_bonemap > 0:
                 self.mdl.seek(MDL_OFFSET + off_bonemap)
@@ -506,7 +507,6 @@ class MdlReader:
                     ]
             else:
                 bonemap = []
-            node_by_bone = dict()
             for node_idx, bone_idx in enumerate(bonemap):
                 if bone_idx == -1:
                     continue
@@ -596,7 +596,7 @@ class MdlReader:
                         vert_weights = []
                         for i in range(4):
                             bone_idx = bone_indices[i]
-                            if bone_idx == -1:
+                            if bone_idx == -1 or bone_idx not in node_by_bone:
                                 continue
                             node_idx = node_by_bone[bone_idx]
                             node_name = self.node_names[node_idx]

@@ -1,4 +1,4 @@
-﻿# ##### BEGIN GPL LICENSE BLOCK #####
+# ##### BEGIN GPL LICENSE BLOCK #####
 #
 #  This program is free software; you can redistribute it and/or
 #  modify it under the terms of the GNU General Public License
@@ -109,7 +109,7 @@ from .ui.props.scene import ScenePropertyGroup
 bl_info = {
     "name": "KotorBlender",
     "author": "seedhartha",
-    "version": (4, 0, 4),
+    "version": (4, 0, 5),
     "blender": (3, 6),
     "location": "File > Import-Export, Object Properties",
     "description": "Import, edit and export KotOR models",
