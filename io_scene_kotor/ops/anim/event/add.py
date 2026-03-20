@@ -25,11 +25,15 @@ from ....utils import is_mdl_root
 class KB_OT_add_anim_event(bpy.types.Operator):
     bl_idname = "kb.add_anim_event"
     bl_label = "Add event to the animation"
+    bl_description = "Add a new event to the selected animation (e.g. for sound or script triggers)"
     bl_options = {"UNDO"}
 
     @classmethod
     def poll(cls, context):
-        return is_mdl_root(context.object)
+        if not context.object or not is_mdl_root(context.object):
+            cls.poll_message_set(context, "Select a KotOR model object")
+            return False
+        return True
 
     def execute(self, context):
         obj = context.object

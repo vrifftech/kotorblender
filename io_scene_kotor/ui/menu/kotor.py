@@ -29,7 +29,7 @@ class KB_MT_kotor_lightmaps(Menu):
 
 
 class KB_MT_kotor_minimap(Menu):
-    bl_label = "Mininmap"
+    bl_label = "Minimap"
 
     def draw(self, context):
         layout = self.layout

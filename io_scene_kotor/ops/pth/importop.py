@@ -27,6 +27,7 @@ from ...utils import logger
 class KB_OT_import_pth(bpy.types.Operator, ImportHelper):
     bl_idname = "kb.pthimport"
     bl_label = "Import KotOR PTH"
+    bl_description = "Import a KotOR path/navigation file (.pth) as path point objects"
 
     filename_ext = ".pth"
 

@@ -93,6 +93,16 @@ Extension module name: `bl_ext.user_default.io_scene_kotor`
         └── test_mdl_minimal.py      ← Minimal MDL export/reimport (5 cases)
 ```
 
+### Architecture (data flow)
+
+- **format/** — Low-level binary parsers (MDL/MDX, BWM, GFF, TPC). Read/write bytes; no Blender types.
+- **io/** — High-level I/O: `load_mdl`/`save_mdl`, `load_lyt`/`save_lyt`, `load_pth`/`save_pth`. Take an operator (for `report()`) and file path; build or consume **scene** structures.
+- **scene/** — Intermediate representation: `model`, `walkmesh`, `animation`, `animnode`, `material`, `armature`, **modelnode/** (base, dummy, reference, trimesh, danglymesh, skinmesh, emitter, light, aabb, lightsaber). Converted to/from Blender objects and format types.
+- **ops/** — Blender operators. Call into **io/** and **scene/**; handle exceptions and `self.report()`.
+- **ui/** — Panels, menus, lists, property groups. Drive operator invocation and display **scene**-backed props.
+
+Import flow: file → **format** (parse) → **io** (to scene) → **scene** (to Blender objects). Export: Blender objects → **scene** (from props) → **io** (from scene) → **format** (serialize) → file.
+
 ---
 
 ### IDE setup (type stubs)
@@ -219,6 +229,12 @@ The test runner (`test/run_blender_tests.sh`) automatically picks up any
 - **GUI mode requires `libegl1`.**  
   `sudo apt-get install -y libegl1` before launching Blender with a display.
 
+- **Accessibility (keyboard).**  
+  All KotOR operators are reachable via Blender menus (File → Import/Export,
+  Editor → KotOR). No custom keymaps; keyboard-only users can use Blender’s
+  built-in menu navigation (Tab, arrows, Enter). Operators use `bl_label` and
+  `bl_description` for tooltips and screen readers.
+
 - **Star imports cause ruff warnings.**  
   There are 400+ pre-existing `F401`/`F403` warnings from star imports across
   several files.  Only `E9` / `F821` / `F823` (actual errors) are treated as
@@ -269,3 +285,25 @@ class _Op:
     def report(self, level, message):
         print(f"  [{next(iter(level))}] {message}")
 ```
+
+---
+
+## Learned User Preferences
+
+- Prefer unit tests that do not monkey patch; use real temp files, real bpy objects, and real data structures.
+- When asked to run or fix tests, continue until the suite passes (run/fix until functional).
+
+---
+
+## Learned Workspace Facts
+
+- On Windows, `test/run_blender_tests.py` discovers Blender under Program Files / Program Files (x86) when `BLENDER` is not set; set `BLENDER` to the executable if auto-detect fails.
+- The test runner syncs the repo addon into Blender’s extensions directory so tests run against current code; on Windows use overwrite-only copy (no rmtree) so the sync succeeds.
+- In addon preferences, avoid `StringProperty` or other typing that triggers `get_type_hints` in Blender 4.4 or addon registration can fail.
+- In `scene/modelnode/base.py`, `find_node` must be recursive so an AabbNode under a nested dummy (e.g. root → pivot → areawalk) is found for WOK export.
+- Use `from __future__ import annotations` in `base.py` when using `BaseNode` in type hints in the same module.
+- Tests that depend on `test_files/` (e.g. fixed MDL, PyKotor assets) should skip gracefully when the directory or files are missing so CI without assets exits 0.
+- KotorBlender is distributed as a Blender extension .zip, not an .exe; users install via Blender → Edit → Preferences → Extensions → Install from Disk.
+- Tagging a version (e.g. `v*.*.*`) triggers `.github/workflows/release.yml` and attaches the built zip to a GitHub Release; use `gh release create` / `gh release upload` for manual release.
+- For VS Code/Cursor Test Explorer and pytest, restrict discovery to `test/unit` only (pytest.ini and python.testing.pytestArgs); install pytest and requirements-dev in the project `.venv` so discovery runs without Blender.
+- MDL import treats a missing MDX file as optional; when the MDX is absent the reader uses empty geometry data instead of raising.

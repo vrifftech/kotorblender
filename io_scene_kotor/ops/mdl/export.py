@@ -28,6 +28,7 @@ from ...utils import logger
 class KB_OT_export_mdl(bpy.types.Operator, ExportHelper):
     bl_idname = "kb.mdlexport"
     bl_label = "Export KotOR MDL"
+    bl_description = "Export the selected KotOR model to binary MDL/MDX format"
 
     filename_ext = ".mdl"
 

@@ -52,6 +52,9 @@ jobs:
         # Star-import warnings (F401/F403) are pre-existing and excluded.
         run: ruff check --select E9,F821,F823 io_scene_kotor/
 
+      - name: Unit tests (no Blender)
+        run: python -m pytest test/unit -v
+
   # ── Blender background-mode tests + extension build ──────────────────────
   test-and-build:
     name: Test & Build (Blender 4.2.0)

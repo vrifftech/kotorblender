@@ -16,31 +16,41 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
+from __future__ import annotations
+
+from typing import ClassVar
+
 import bpy
 
 from ...utils import is_mdl_root
 
 
 class KB_OT_move_animation(bpy.types.Operator):
-    bl_idname = "kb.move_animation"
-    bl_label = "Move an animation in the list, without affecting keyframes"
-    bl_options = {"UNDO"}
+    bl_idname: ClassVar[str] = "kb.move_animation"
+    bl_label: ClassVar[str] = "Move an animation in the list, without affecting keyframes"
+    bl_description: ClassVar[str] = "Reorder the selected animation up or down in the list without changing keyframes"
+    bl_options: ClassVar[set[str]] = {"UNDO"}
 
-    direction: bpy.props.EnumProperty(items=(("UP", "Up", ""), ("DOWN", "Down", "")))
+    direction: bpy.props.EnumProperty(items=[("UP", "Up", ""), ("DOWN", "Down", "")])  # pyright: ignore[reportInvalidTypeForm]
 
     @classmethod
-    def poll(cls, context):
+    def poll(cls, context: bpy.types.Context) -> bool:
         obj = context.object
-        if not is_mdl_root(obj):
+        if not obj or not is_mdl_root(obj):
+            cls.poll_message_set(context, "Select a KotOR model object")
             return False
-
         anim_list = obj.kb.anim_list
         anim_list_idx = obj.kb.anim_list_idx
         num_anims = len(anim_list)
+        if anim_list_idx < 0 or anim_list_idx >= num_anims:
+            cls.poll_message_set(context, "Select an animation in the list")
+            return False
+        if num_anims < 2:
+            cls.poll_message_set(context, "At least two animations required to reorder")
+            return False
+        return True
 
-        return anim_list_idx >= 0 and anim_list_idx < len(anim_list) and num_anims >= 2
-
-    def execute(self, context):
+    def execute(self, context: bpy.types.Context) -> set[str]:
         mdl_root = context.object
         anim_list = mdl_root.kb.anim_list
         prev_idx = mdl_root.kb.anim_list_idx

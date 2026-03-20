@@ -16,36 +16,39 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-import bpy
+from __future__ import annotations
 
+from collections.abc import Callable
+
+import bpy
 from mathutils import Matrix, Quaternion
 
-from ...constants import RootType
+from ...constants import ImportOptions, RootType
 
 
 class BaseNode:
     def __init__(self, name="UNNAMED"):
-        self.nodetype = "undefined"
-        self.roottype = RootType.MODEL
+        self.nodetype: str = "undefined"
+        self.roottype: str = RootType.MODEL
 
-        self.node_number = -1
-        self.export_order = 0
-        self.name = name
-        self.position = (0.0, 0.0, 0.0)
-        self.orientation = (1.0, 0.0, 0.0, 0.0)
-        self.scale = 1.0
+        self.node_number: int = -1
+        self.export_order: int = 0
+        self.name: str = name
+        self.position: tuple[float, float, float] = (0.0, 0.0, 0.0)
+        self.orientation: tuple[float, float, float, float] = (1.0, 0.0, 0.0, 0.0)
+        self.scale: float = 1.0
 
-        self.parent = None
-        self.children = []
-        self.from_root = Matrix()
+        self.parent: BaseNode | None = None
+        self.children: list[BaseNode] = []
+        self.from_root: Matrix = Matrix()
 
-    def add_to_collection(self, collection, options):
+    def add_to_collection(self, collection: bpy.types.Collection, options: ImportOptions) -> bpy.types.Object:
         obj = bpy.data.objects.new(self.name, None)
         self.set_object_data(obj, options)
         collection.objects.link(obj)
         return obj
 
-    def set_object_data(self, obj, options):
+    def set_object_data(self, obj: bpy.types.Object, options: ImportOptions) -> None:
         obj.kb.node_number = self.node_number
         obj.kb.export_order = self.export_order
         obj.location = self.position
@@ -53,27 +56,26 @@ class BaseNode:
         obj.rotation_quaternion = Quaternion(self.orientation)
         obj.scale = (self.scale, self.scale, self.scale)
 
-    def load_object_data(self, obj, eval_obj, options):
+    def load_object_data(self, obj: bpy.types.Object, eval_obj: bpy.types.Object, options: ImportOptions) -> None:
         if obj.kb.node_number == -1:
-            raise RuntimeError("Object '{}' node number is undefined".format(obj.name))
+            raise RuntimeError(f"Object '{obj.name}' node number is undefined")
         self.node_number = obj.kb.node_number
         self.export_order = obj.kb.export_order
         self.position = eval_obj.location
         if eval_obj.rotation_mode != "QUATERNION":
-            raise RuntimeError(
-                "Object '{}' must have Quaternion rotation mode".format(eval_obj.name)
-            )
+            raise RuntimeError(f"Object '{eval_obj.name}' must have Quaternion rotation mode")
         self.orientation = eval_obj.rotation_quaternion
         self.scale = eval_obj.scale[0]
 
         self.from_root = eval_obj.matrix_local
-        if self.parent:
+        if self.parent is not None:
             self.from_root = self.parent.from_root @ self.from_root
 
-    def find_node(self, test):
+    def find_node(self, test: Callable[[BaseNode], bool]) -> BaseNode | None:
         if test(self):
             return self
         for child in self.children:
-            if test(child):
-                return child
+            result = child.find_node(test)
+            if result is not None:
+                return result
         return None

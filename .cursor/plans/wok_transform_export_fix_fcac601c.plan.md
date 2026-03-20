@@ -27,7 +27,7 @@ Track these when you start implementation (all pending until then):
 | `bwm-peek-vertices`   | Export vertices as **from_root @ local**; drop **lytposition** from the written positions; align **BWM header position** with that layout and sanity-check in-game. |
 | `bwm-normals-header`  | **Rotate normals** with the linear part of **from_root**; fix **save_header** for area WOK and for **PWK/DWK** so headers match baked geometry.                     |
 | `tests-wok-transform` | **New Blender test**: nested transform on parent, export **.wok**, compare stored verts to expected model-space positions.                                          |
-| `verify-ci-pr`        | **ruff** + `**test/run_blender_tests.sh`**; optional Holocron pass; `**gh pr create**` using the plan’s suggested title/body.                                       |
+| `verify-ci-pr`        | **ruff** + `**test/run_blender_tests.sh`**; optional Holocron pass; `**gh pr create`** using the plan’s suggested title/body.                                       |
 
 
 ## Enhancement summary

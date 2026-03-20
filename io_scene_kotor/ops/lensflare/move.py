@@ -22,6 +22,7 @@ import bpy
 class KB_OT_move_lens_flare(bpy.types.Operator):
     bl_idname = "kb.move_lens_flare"
     bl_label = "Move lens flare within the list"
+    bl_description = "Reorder the selected lens flare up or down in the list"
 
     direction: bpy.props.EnumProperty(items=(("UP", "Up", ""),
                                              ("DOWN", "Down", "")))
@@ -29,14 +30,25 @@ class KB_OT_move_lens_flare(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         obj = context.object
-        if not obj or obj.type != 'LIGHT' or not obj.kb.lensflares:
+        if not obj:
+            cls.poll_message_set(context, "Select an object")
             return False
-
+        if obj.type != "LIGHT":
+            cls.poll_message_set(context, "Select a light object")
+            return False
+        if not obj.kb.lensflares:
+            cls.poll_message_set(context, "Light must have lens flares enabled")
+            return False
         flare_list = obj.kb.flare_list
         flare_list_idx = obj.kb.flare_list_idx
         num_flares = len(flare_list)
-
-        return flare_list_idx >= 0 and flare_list_idx < num_flares and num_flares >= 2
+        if flare_list_idx < 0 or flare_list_idx >= num_flares:
+            cls.poll_message_set(context, "Select a lens flare in the list")
+            return False
+        if num_flares < 2:
+            cls.poll_message_set(context, "At least two lens flares required to reorder")
+            return False
+        return True
 
     def move_index(self, context):
         obj = context.object

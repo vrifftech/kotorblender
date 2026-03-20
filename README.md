@@ -14,7 +14,9 @@ Significant changes have been introduced since KotORBlender 1.01, including, but
 
 ## Compatibility
 
-Current version of KotorBlender is fully compatible with Blender versions 3.6, 4.2, and 5.0. Blender development moves fast and is known to introduce breaking changes, therefore compatibility with any other version of Blender is not guaranteed.
+Current version of KotorBlender is fully compatible with Blender versions 3.6, 4.2, and 5.0.
+
+**Format notes:** TPC and TXI textures are read-only (import only). TGA is supported via Blender. For E2E testing with extracted game assets, see [TESTING.md](TESTING.md) (requires `DATA_DIR`). Blender development moves fast and is known to introduce breaking changes, therefore compatibility with any other version of Blender is not guaranteed.
 
 ## Installation
 
@@ -103,6 +105,11 @@ Fine-tuning:
 1. Import PTH into Blender via File → Import → KotOR Path (.pth)
 1. Create/move path points, or modify path connections via Object Properties
 1. Export PTH via File → Export → KotOR Path (.pth)
+
+## Contributing and testing
+
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — How to contribute, run tests, and submit pull requests.
+- **[TESTING.md](TESTING.md)** — E2E testing with game assets. For asset-free tests and Makefile targets, see [AGENTS.md](AGENTS.md).
 
 ## License
 

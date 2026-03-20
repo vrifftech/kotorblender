@@ -16,13 +16,16 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-import os
+from __future__ import annotations
 
+import math
+import os
 from math import sqrt
+from typing import TYPE_CHECKING
 
 from mathutils import Matrix, Quaternion, Vector
 
-from ...constants import NodeType, NULL
+from ...constants import NULL, NodeType
 from ...scene.animation import Animation
 from ...scene.animnode import AnimationNode
 from ...scene.model import Model
@@ -36,10 +39,11 @@ from ...scene.modelnode.reference import ReferenceNode
 from ...scene.modelnode.skinmesh import SkinmeshNode
 from ...scene.modelnode.trimesh import FaceList, TrimeshNode
 from ...utils import logger
-
 from ..binreader import BinaryReader
-
 from .types import *
+
+if TYPE_CHECKING:
+    from io_scene_kotor.scene.modelnode.base import BaseNode
 
 MDL_OFFSET = 12
 
@@ -60,27 +64,34 @@ SABER_FACES = [
 
 
 class ArrayDefinition:
-    def __init__(self, offset, count):
-        self.offset = offset
-        self.count = count
+    def __init__(self, offset: int, count: int):
+        self.offset: int = offset
+        self.count: int = count
 
 
 class MdlReader:
-    def __init__(self, path):
-        self.path = path
-        self.mdl = BinaryReader(path, "little")
+    def __init__(self, path: str):
+        self.path: str = path
+        self.mdl: BinaryReader = BinaryReader(path, "little")
+        self.mdx: BinaryReader | None = None
+        self.model: Model | None = None
+        self.off_root_node: int = 0
+        self.animation_arr: ArrayDefinition | None = None
+        self.name_arr: ArrayDefinition | None = None
+        self.names: list[str] = []
+        self.node_names: list[str] = []
+        self.node_by_number: dict[int, BaseNode] = {}
+        self.node_by_name: dict[str, BaseNode] = {}
 
         base, _ = os.path.splitext(path)
         mdx_path = base + ".mdx"
-        if not os.path.exists(mdx_path):
-            raise RuntimeError("MDX file '{}' not found".format(mdx_path))
+        if os.path.exists(mdx_path):
+            self.mdx = BinaryReader(mdx_path, "little")
+        else:
+            self.mdx = None
 
-        self.mdx = BinaryReader(mdx_path, "little")
-
-        self.tsl = False
-        self.xbox = False
-        self.node_names = []
-        self.node_by_number = dict()
+        self.tsl: bool = False
+        self.xbox: bool = False
 
     def load(self):
         self.model = Model()
@@ -100,8 +111,8 @@ class MdlReader:
     def load_file_header(self):
         if self.mdl.read_uint32() != 0:
             raise RuntimeError("Invalid MDL signature")
-        self.mdl_size = self.mdl.read_uint32()
-        self.mdx_size = self.mdl.read_uint32()
+        self.mdl_size: int = self.mdl.read_uint32()
+        self.mdx_size: int = self.mdl.read_uint32()
 
     def load_geometry_header(self):
         fn_ptr1 = self.mdl.read_uint32()
@@ -110,32 +121,33 @@ class MdlReader:
         if fn_ptr1 in [MODEL_FN_PTR_1_K1_XBOX, MODEL_FN_PTR_1_K2_XBOX]:
             self.xbox = True
 
-        fn_ptr2 = self.mdl.read_uint32()
+        _fn_ptr2 = self.mdl.read_uint32()
         model_name = self.mdl.read_c_string_up_to(32)
         self.off_root_node = self.mdl.read_uint32()
-        total_num_nodes = self.mdl.read_uint32()
-        runtime_arr1 = self.get_array_def()
-        runtime_arr2 = self.get_array_def()
-        ref_count = self.mdl.read_uint32()
+        _total_num_nodes = self.mdl.read_uint32()
+        _runtime_arr1 = self.get_array_def()
+        _runtime_arr2 = self.get_array_def()
+        _ref_count = self.mdl.read_uint32()
 
         self.model_type = self.mdl.read_uint8()
         if self.model_type != 2:
-            raise RuntimeError(
-                "Invalid model type: expected=2, actual={}".format(self.model_type)
-            )
+            raise RuntimeError("Invalid model type: expected=2, actual={}".format(self.model_type))
 
         self.mdl.skip(3)  # padding
 
-        self.model.name = model_name
+        if self.model:
+            self.model.name = model_name
+        else:
+            raise RuntimeError("Model not initialized")
 
     def load_model_header(self):
         classification = self.mdl.read_uint8()
         subclassification = self.mdl.read_uint8()
         smoothing = self.mdl.read_uint8()
         affected_by_fog = self.mdl.read_uint8()
-        num_child_models = self.mdl.read_uint32()
+        _num_child_models = self.mdl.read_uint32()
         self.animation_arr = self.get_array_def()
-        supermodel_ref = self.mdl.read_uint32()
+        _supermodel_ref = self.mdl.read_uint32()
         bounding_box = [self.mdl.read_float() for _ in range(6)]
         radius = self.mdl.read_float()
         scale = self.mdl.read_float()
@@ -145,15 +157,12 @@ class MdlReader:
 
         mdx_size = self.mdl.read_uint32()
         if mdx_size != self.mdx_size:
-            raise RuntimeError(
-                "MDX size mismatch: expected={}, actual={}".format(
-                    self.mdx_size, mdx_size
-                )
-            )
+            raise RuntimeError("MDX size mismatch: expected={}, actual={}".format(self.mdx_size, mdx_size))
 
-        mdx_offset = self.mdl.read_uint32()
+        _mdx_offset = self.mdl.read_uint32()
         self.name_arr = self.get_array_def()
 
+        assert self.model is not None, "Model not initialized"
         try:
             self.model.classification = CLASS_BY_VALUE[classification]
         except KeyError:
@@ -161,14 +170,15 @@ class MdlReader:
         self.model.subclassification = subclassification
         self.model.supermodel = supermodel_name
         self.model.animscale = scale
-        self.model.affected_by_fog = affected_by_fog
+        self.model.affected_by_fog = bool(affected_by_fog)
         self.model.classification_unk1 = smoothing
-        self.model.bounding_box_min = bounding_box[:3]
-        self.model.bounding_box_max = bounding_box[3:]
+        self.model.bounding_box_min = tuple(bounding_box[:3])
+        self.model.bounding_box_max = tuple(bounding_box[3:])
         self.model.model_radius = radius
 
     def load_names(self):
         self.names = []
+        assert self.name_arr is not None, "Name array not initialized"
         self.mdl.seek(MDL_OFFSET + self.name_arr.offset)
         offsets = [self.mdl.read_uint32() for _ in range(self.name_arr.count)]
         for off in offsets:
@@ -183,11 +193,7 @@ class MdlReader:
         children_arr = self.get_array_def()
 
         if name_index >= len(self.names):
-            raise RuntimeError(
-                "Node name index out of range: index={}, count={}".format(
-                    name_index, len(self.names)
-                )
-            )
+            raise RuntimeError("Node name index out of range: index={}, count={}".format(name_index, len(self.names)))
         name = self.names[name_index]
         self.node_names.append(name)
 
@@ -196,15 +202,20 @@ class MdlReader:
         for off_child in child_offsets:
             self.peek_nodes(off_child)
 
-    def load_nodes(self, offset, export_order, parent=None):
+    def load_nodes(
+        self,
+        offset: int,
+        export_order: int,
+        parent: BaseNode | None = None,
+    ) -> BaseNode:
         self.mdl.seek(MDL_OFFSET + offset)
 
         type_flags = self.mdl.read_uint16()
         node_number = self.mdl.read_uint16()
         name_index = self.mdl.read_uint16()
         self.mdl.skip(2)  # padding
-        off_root = self.mdl.read_uint32()
-        off_parent = self.mdl.read_uint32()
+        _off_root = self.mdl.read_uint32()
+        _off_parent = self.mdl.read_uint32()
         position = [self.mdl.read_float() for _ in range(3)]
         orientation = [self.mdl.read_float() for _ in range(4)]
         children_arr = self.get_array_def()
@@ -212,14 +223,10 @@ class MdlReader:
         controller_data_arr = self.get_array_def()
 
         if name_index >= len(self.names):
-            raise RuntimeError(
-                "Node name index out of range: index={}, count={}".format(
-                    name_index, len(self.names)
-                )
-            )
+            raise RuntimeError("Node name index out of range: index={}, count={}".format(name_index, len(self.names)))
         name = self.names[name_index]
-        node_type = self.get_node_type(type_flags)
-        node = self.new_node(name, node_type)
+        node_type: str = self.get_node_type(type_flags)
+        node: BaseNode = self.new_node(name, node_type)
 
         self.node_by_number[node_number] = node
 
@@ -229,15 +236,11 @@ class MdlReader:
 
         node.node_number = node_number
         node.export_order = export_order
-        node.position = position
-        node.orientation = orientation
-        node.from_root = (
-            node.from_root
-            @ Matrix.Translation(Vector(position))
-            @ Quaternion(orientation).to_matrix().to_4x4()
-        )
+        node.position = tuple(position)
+        node.orientation = tuple(orientation)
+        node.from_root = node.from_root @ Matrix.Translation(Vector(position)) @ Quaternion(orientation).to_matrix().to_4x4()
 
-        if offset == self.off_anim_root:
+        if offset == self.off_anim_root and self.model:
             self.model.animroot = name
 
         if type_flags & NODE_LIGHT:
@@ -255,15 +258,15 @@ class MdlReader:
             flare = self.mdl.read_uint32()
             fading_light = self.mdl.read_uint32()
 
-            node.shadow = shadow
-            node.lightpriority = light_priority
-            node.ambientonly = ambient_only
-            node.dynamictype = dynamic_type
-            node.affectdynamic = affect_dynamic
-            node.fadinglight = fading_light
-            node.lensflares = flare
-            node.flareradius = flare_radius
-            node.flare_list = FlareList()
+            node.shadow = shadow  # pyright: ignore[reportAttributeAccessIssue]
+            node.lightpriority = light_priority  # pyright: ignore[reportAttributeAccessIssue]
+            node.ambientonly = ambient_only  # pyright: ignore[reportAttributeAccessIssue]
+            node.dynamictype = dynamic_type  # pyright: ignore[reportAttributeAccessIssue]
+            node.affectdynamic = affect_dynamic  # pyright: ignore[reportAttributeAccessIssue]
+            node.fadinglight = fading_light  # pyright: ignore[reportAttributeAccessIssue]
+            node.lensflares = flare  # pyright: ignore[reportAttributeAccessIssue]
+            node.flareradius = flare_radius  # pyright: ignore[reportAttributeAccessIssue]
+            node.flare_list = FlareList()  # pyright: ignore[reportAttributeAccessIssue]
 
         if type_flags & NODE_EMITTER:
             dead_space = self.mdl.read_float()
@@ -288,50 +291,46 @@ class MdlReader:
             flags = self.mdl.read_uint32()
 
             # object data
-            node.deadspace = dead_space
-            node.blastradius = blast_radius
-            node.blastlength = blast_length
-            node.num_branches = num_branches
-            node.controlptsmoothing = ctrl_point_smoothing
-            node.xgrid = x_grid
-            node.ygrid = y_grid
-            node.spawntype = spawn_type
-            node.update = update
-            node.emitter_render = emitter_render
-            node.blend = blend
-            node.texture = texture
-            node.chunk_name = chunk_name
-            node.twosidedtex = twosided_tex != 0
-            node.loop = loop != 0
-            node.renderorder = render_order
-            node.frame_blending = frame_blending != 0
-            node.depth_texture_name = (
-                depth_texture_name
-                if len(depth_texture_name) > 0 and depth_texture_name.lower() != "null"
-                else NULL
-            )
+            node.deadspace = dead_space  # pyright: ignore[reportAttributeAccessIssue]
+            node.blastradius = blast_radius  # pyright: ignore[reportAttributeAccessIssue]
+            node.blastlength = blast_length  # pyright: ignore[reportAttributeAccessIssue]
+            node.num_branches = num_branches  # pyright: ignore[reportAttributeAccessIssue]
+            node.controlptsmoothing = ctrl_point_smoothing  # pyright: ignore[reportAttributeAccessIssue]
+            node.xgrid = x_grid  # pyright: ignore[reportAttributeAccessIssue]
+            node.ygrid = y_grid  # pyright: ignore[reportAttributeAccessIssue]
+            node.spawntype = spawn_type  # pyright: ignore[reportAttributeAccessIssue]
+            node.update = update  # pyright: ignore[reportAttributeAccessIssue]
+            node.emitter_render = emitter_render  # pyright: ignore[reportAttributeAccessIssue]
+            node.blend = blend  # pyright: ignore[reportAttributeAccessIssue]
+            node.texture = texture  # pyright: ignore[reportAttributeAccessIssue]
+            node.chunk_name = chunk_name  # pyright: ignore[reportAttributeAccessIssue]
+            node.twosidedtex = twosided_tex != 0  # pyright: ignore[reportAttributeAccessIssue]
+            node.loop = loop != 0  # pyright: ignore[reportAttributeAccessIssue]
+            node.renderorder = render_order  # pyright: ignore[reportAttributeAccessIssue]
+            node.frame_blending = frame_blending != 0  # pyright: ignore[reportAttributeAccessIssue]
+            node.depth_texture_name = depth_texture_name if len(depth_texture_name) > 0 and depth_texture_name.lower() != "null" else NULL  # pyright: ignore[reportAttributeAccessIssue]
             # flags
-            node.p2p = flags & EMITTER_FLAG_P2P != 0
-            node.p2p_sel = flags & EMITTER_FLAG_P2P_SEL != 0
-            node.affected_by_wind = flags & EMITTER_FLAG_AFFECTED_WIND != 0
-            node.tinted = flags & EMITTER_FLAG_TINTED != 0
-            node.bounce = flags & EMITTER_FLAG_BOUNCE != 0
-            node.random = flags & EMITTER_FLAG_RANDOM != 0
-            node.inherit = flags & EMITTER_FLAG_INHERIT != 0
-            node.inheritvel = flags & EMITTER_FLAG_INHERIT_VEL != 0
-            node.inherit_local = flags & EMITTER_FLAG_INHERIT_LOCAL != 0
-            node.splat = flags & EMITTER_FLAG_SPLAT != 0
-            node.inherit_part = flags & EMITTER_FLAG_INHERIT_PART != 0
-            node.depth_texture = flags & EMITTER_FLAG_DEPTH_TEXTURE != 0
-            node.flag13 = flags & EMITTER_FLAG_13 != 0
-            node.extra_flags = flags & ~EMITTER_FLAG_KNOWN_MASK
+            node.p2p = flags & EMITTER_FLAG_P2P != 0  # pyright: ignore[reportAttributeAccessIssue]
+            node.p2p_sel = flags & EMITTER_FLAG_P2P_SEL != 0  # pyright: ignore[reportAttributeAccessIssue]
+            node.affected_by_wind = flags & EMITTER_FLAG_AFFECTED_WIND != 0  # pyright: ignore[reportAttributeAccessIssue]
+            node.tinted = flags & EMITTER_FLAG_TINTED != 0  # pyright: ignore[reportAttributeAccessIssue]
+            node.bounce = flags & EMITTER_FLAG_BOUNCE != 0  # pyright: ignore[reportAttributeAccessIssue]
+            node.random = flags & EMITTER_FLAG_RANDOM != 0  # pyright: ignore[reportAttributeAccessIssue]
+            node.inherit = flags & EMITTER_FLAG_INHERIT != 0  # pyright: ignore[reportAttributeAccessIssue]
+            node.inheritvel = flags & EMITTER_FLAG_INHERIT_VEL != 0  # pyright: ignore[reportAttributeAccessIssue]
+            node.inherit_local = flags & EMITTER_FLAG_INHERIT_LOCAL != 0  # pyright: ignore[reportAttributeAccessIssue]
+            node.splat = flags & EMITTER_FLAG_SPLAT != 0  # pyright: ignore[reportAttributeAccessIssue]
+            node.inherit_part = flags & EMITTER_FLAG_INHERIT_PART != 0  # pyright: ignore[reportAttributeAccessIssue]
+            node.depth_texture = flags & EMITTER_FLAG_DEPTH_TEXTURE != 0  # pyright: ignore[reportAttributeAccessIssue]
+            node.flag13 = flags & EMITTER_FLAG_13 != 0  # pyright: ignore[reportAttributeAccessIssue]
+            node.extra_flags = flags & ~EMITTER_FLAG_KNOWN_MASK  # pyright: ignore[reportAttributeAccessIssue]
 
         if type_flags & NODE_REFERENCE:
             ref_model = self.mdl.read_c_string_up_to(32)
             reattachable = self.mdl.read_uint32()
 
-            node.refmodel = ref_model
-            node.reattachable = reattachable
+            node.refmodel = ref_model  # pyright: ignore[reportAttributeAccessIssue]
+            node.reattachable = reattachable  # pyright: ignore[reportAttributeAccessIssue]
 
         if type_flags & NODE_MESH:
             fn_ptr1 = self.mdl.read_uint32()
@@ -394,33 +393,33 @@ class MdlReader:
             if not self.xbox:
                 off_vert_arr = self.mdl.read_uint32()
 
-            node.render = render
-            node.shadow = shadow
-            node.lightmapped = has_lightmap
-            node.beaming = beaming
-            node.tangentspace = 1 if mdx_data_bitmap & MDX_FLAG_TANGENT1 else 0
-            node.rotatetexture = rotate_texture
-            node.background_geometry = background_geometry
-            node.animateuv = animate_uv
-            node.uvdirectionx = uv_dir_x
-            node.uvdirectiony = uv_dir_y
-            node.uvjitter = uv_jitter
-            node.uvjitterspeed = uv_jitter_speed
-            node.transparencyhint = transparency_hint
-            node.ambient = ambient
-            node.diffuse = diffuse
-            node.center = average
+            node.render = render  # pyright: ignore[reportAttributeAccessIssue]
+            node.shadow = shadow  # pyright: ignore[reportAttributeAccessIssue]
+            node.lightmapped = has_lightmap  # pyright: ignore[reportAttributeAccessIssue]
+            node.beaming = beaming  # pyright: ignore[reportAttributeAccessIssue]
+            node.tangentspace = 1 if mdx_data_bitmap & MDX_FLAG_TANGENT1 else 0  # pyright: ignore[reportAttributeAccessIssue]
+            node.rotatetexture = rotate_texture  # pyright: ignore[reportAttributeAccessIssue]
+            node.background_geometry = background_geometry  # pyright: ignore[reportAttributeAccessIssue]
+            node.animateuv = animate_uv  # pyright: ignore[reportAttributeAccessIssue]
+            node.uvdirectionx = uv_dir_x  # pyright: ignore[reportAttributeAccessIssue]
+            node.uvdirectiony = uv_dir_y  # pyright: ignore[reportAttributeAccessIssue]
+            node.uvjitter = uv_jitter  # pyright: ignore[reportAttributeAccessIssue]
+            node.uvjitterspeed = uv_jitter_speed  # pyright: ignore[reportAttributeAccessIssue]
+            node.transparencyhint = transparency_hint  # pyright: ignore[reportAttributeAccessIssue]
+            node.ambient = ambient  # pyright: ignore[reportAttributeAccessIssue]
+            node.diffuse = diffuse  # pyright: ignore[reportAttributeAccessIssue]
+            node.center = average  # pyright: ignore[reportAttributeAccessIssue]
 
             if len(bitmap) > 0 and bitmap.lower() != "null":
-                node.bitmap = bitmap
+                node.bitmap = bitmap  # pyright: ignore[reportAttributeAccessIssue]
             if len(bitmap2) > 0 and bitmap2.lower() != "null":
-                node.bitmap2 = bitmap2
+                node.bitmap2 = bitmap2  # pyright: ignore[reportAttributeAccessIssue]
 
             if self.tsl:
-                node.dirt_enabled = dirt_enabled
-                node.dirt_texture = dirt_texture
-                node.dirt_worldspace = dirt_coord_space
-                node.hologram_donotdraw = hide_in_holograms
+                node.dirt_enabled = dirt_enabled  # pyright: ignore[reportAttributeAccessIssue]
+                node.dirt_texture = dirt_texture  # pyright: ignore[reportAttributeAccessIssue]
+                node.dirt_worldspace = dirt_coord_space  # pyright: ignore[reportAttributeAccessIssue]
+                node.hologram_donotdraw = hide_in_holograms  # pyright: ignore[reportAttributeAccessIssue]
 
         if type_flags & NODE_SKIN:
             unknown_arr = self.get_array_def()
@@ -441,9 +440,9 @@ class MdlReader:
             period = self.mdl.read_float()
             off_vert_data = self.mdl.read_uint32()
 
-            node.displacement = displacement
-            node.period = period
-            node.tightness = tightness
+            node.displacement = displacement  # pyright: ignore[reportAttributeAccessIssue]
+            node.period = period  # pyright: ignore[reportAttributeAccessIssue]
+            node.tightness = tightness  # pyright: ignore[reportAttributeAccessIssue]
 
         if type_flags & NODE_AABB:
             off_root_aabb = self.mdl.read_uint32()
@@ -459,47 +458,15 @@ class MdlReader:
         if controller_arr.count > 0:
             controllers = self.load_controllers(controller_arr, controller_data_arr)
             if type_flags & NODE_MESH:
-                node.alpha = (
-                    controllers[CTRL_MESH_ALPHA][0][1]
-                    if CTRL_MESH_ALPHA in controllers
-                    else 1.0
-                )
-                node.scale = (
-                    controllers[CTRL_MESH_SCALE][0][1]
-                    if CTRL_MESH_SCALE in controllers
-                    else 1.0
-                )
-                node.selfillumcolor = (
-                    controllers[CTRL_MESH_SELFILLUMCOLOR][0][1:]
-                    if CTRL_MESH_SELFILLUMCOLOR in controllers
-                    else [0.0] * 3
-                )
+                node.alpha = controllers[CTRL_MESH_ALPHA][0][1] if CTRL_MESH_ALPHA in controllers else 1.0  # pyright: ignore[reportAttributeAccessIssue]
+                node.scale = controllers[CTRL_MESH_SCALE][0][1] if CTRL_MESH_SCALE in controllers else 1.0
+                node.selfillumcolor = controllers[CTRL_MESH_SELFILLUMCOLOR][0][1:] if CTRL_MESH_SELFILLUMCOLOR in controllers else [0.0] * 3  # pyright: ignore[reportAttributeAccessIssue]
             elif type_flags & NODE_LIGHT:
-                node.radius = (
-                    controllers[CTRL_LIGHT_RADIUS][0][1]
-                    if CTRL_LIGHT_RADIUS in controllers
-                    else 1.0
-                )
-                node.shadowradius = (
-                    controllers[CTRL_LIGHT_SHADOWRADIUS][0][1]
-                    if CTRL_LIGHT_SHADOWRADIUS in controllers
-                    else 0.0
-                )
-                node.verticaldisplacement = (
-                    controllers[CTRL_LIGHT_VERTICALDISPLACEMENT][0][1]
-                    if CTRL_LIGHT_VERTICALDISPLACEMENT in controllers
-                    else 0.0
-                )
-                node.multiplier = (
-                    controllers[CTRL_LIGHT_MULTIPLIER][0][1]
-                    if CTRL_LIGHT_MULTIPLIER in controllers
-                    else 1.0
-                )
-                node.color = (
-                    controllers[CTRL_LIGHT_COLOR][0][1:]
-                    if CTRL_LIGHT_COLOR in controllers
-                    else [1.0] * 3
-                )
+                node.radius = controllers[CTRL_LIGHT_RADIUS][0][1] if CTRL_LIGHT_RADIUS in controllers else 1.0  # pyright: ignore[reportAttributeAccessIssue]
+                node.shadowradius = controllers[CTRL_LIGHT_SHADOWRADIUS][0][1] if CTRL_LIGHT_SHADOWRADIUS in controllers else 0.0  # pyright: ignore[reportAttributeAccessIssue]
+                node.verticaldisplacement = controllers[CTRL_LIGHT_VERTICALDISPLACEMENT][0][1] if CTRL_LIGHT_VERTICALDISPLACEMENT in controllers else 0.0  # pyright: ignore[reportAttributeAccessIssue]
+                node.multiplier = controllers[CTRL_LIGHT_MULTIPLIER][0][1] if CTRL_LIGHT_MULTIPLIER in controllers else 1.0  # pyright: ignore[reportAttributeAccessIssue]
+                node.color = controllers[CTRL_LIGHT_COLOR][0][1:] if CTRL_LIGHT_COLOR in controllers else [1.0] * 3  # pyright: ignore[reportAttributeAccessIssue]
             elif type_flags & NODE_EMITTER:
                 for val, key, dim in EMITTER_CONTROLLER_KEYS:
                     if val not in controllers:
@@ -511,27 +478,21 @@ class MdlReader:
 
         if type_flags & NODE_LIGHT:
             self.mdl.seek(MDL_OFFSET + flare_size_arr.offset)
-            node.flare_list.sizes = [
-                self.mdl.read_float() for _ in range(flare_size_arr.count)
-            ]
+            node.flare_list.sizes = [self.mdl.read_float() for _ in range(flare_size_arr.count)]  # pyright: ignore[reportAttributeAccessIssue]
 
             self.mdl.seek(MDL_OFFSET + flare_position_arr.offset)
-            node.flare_list.positions = [
-                self.mdl.read_float() for _ in range(flare_position_arr.count)
-            ]
+            node.flare_list.positions = [self.mdl.read_float() for _ in range(flare_position_arr.count)]  # pyright: ignore[reportAttributeAccessIssue]
 
             self.mdl.seek(MDL_OFFSET + flare_color_shift_arr.offset)
             for _ in range(flare_color_shift_arr.count):
                 color_shift = [self.mdl.read_float() for _ in range(3)]
-                node.flare_list.colorshifts.append(color_shift)
+                node.flare_list.colorshifts.append(color_shift)  # pyright: ignore[reportAttributeAccessIssue]
 
             self.mdl.seek(MDL_OFFSET + flare_tex_name_arr.offset)
-            tex_name_offsets = [
-                self.mdl.read_uint32() for _ in range(flare_tex_name_arr.count)
-            ]
+            tex_name_offsets = [self.mdl.read_uint32() for _ in range(flare_tex_name_arr.count)]
             for tex_name_offset in tex_name_offsets:
                 self.mdl.seek(MDL_OFFSET + tex_name_offset)
-                node.flare_list.textures.append(self.mdl.read_c_string())
+                node.flare_list.textures.append(self.mdl.read_c_string())  # pyright: ignore[reportAttributeAccessIssue]
 
         if type_flags & NODE_SKIN:
             if num_bonemap > 0:
@@ -539,7 +500,10 @@ class MdlReader:
                 if self.xbox:
                     bonemap = [self.mdl.read_uint16() for _ in range(num_bonemap)]
                 else:
-                    bonemap = [int(self.mdl.read_float()) for _ in range(num_bonemap)]
+                    bonemap = [
+                        -1 if math.isnan(f) else int(f)
+                        for f in [self.mdl.read_float() for _ in range(num_bonemap)]
+                    ]
             else:
                 bonemap = []
             node_by_bone = dict()
@@ -549,12 +513,12 @@ class MdlReader:
                 node_by_bone[bone_idx] = node_idx
 
         if type_flags & NODE_MESH:
-            node.facelist = FaceList()
+            node.facelist = FaceList()  # pyright: ignore[reportAttributeAccessIssue]
             if type_flags & NODE_SABER:
                 for face in SABER_FACES:
-                    node.facelist.vertices.append(face)
-                    node.facelist.uv.append(face)
-                    node.facelist.materials.append(0)
+                    node.facelist.vertices.append(face)  # pyright: ignore[reportAttributeAccessIssue]
+                    node.facelist.uv.append(face)  # pyright: ignore[reportAttributeAccessIssue]
+                    node.facelist.materials.append(0)  # pyright: ignore[reportAttributeAccessIssue]
             elif face_arr.count > 0:
                 self.mdl.seek(MDL_OFFSET + face_arr.offset)
                 for _ in range(face_arr.count):
@@ -563,9 +527,9 @@ class MdlReader:
                     material_id = self.mdl.read_uint32()
                     adjacent_faces = [self.mdl.read_uint16() for _ in range(3)]
                     vert_indices = [self.mdl.read_uint16() for _ in range(3)]
-                    node.facelist.vertices.append(tuple(vert_indices))
-                    node.facelist.uv.append(tuple(vert_indices))
-                    node.facelist.materials.append(material_id)
+                    node.facelist.vertices.append(tuple(vert_indices))  # pyright: ignore[reportAttributeAccessIssue]
+                    node.facelist.uv.append(tuple(vert_indices))  # pyright: ignore[reportAttributeAccessIssue]
+                    node.facelist.materials.append(material_id)  # pyright: ignore[reportAttributeAccessIssue]
                 if index_count_arr.count > 0:
                     self.mdl.seek(MDL_OFFSET + index_count_arr.offset)
                     num_indices = self.mdl.read_uint32()
@@ -573,14 +537,14 @@ class MdlReader:
                     self.mdl.seek(MDL_OFFSET + index_offset_arr.offset)
                     off_indices = self.mdl.read_uint32()
 
-            node.verts = []
-            node.uv1 = []
-            node.uv2 = []
-            node.weights = []
+            node.verts = []  # pyright: ignore[reportAttributeAccessIssue]
+            node.uv1 = []  # pyright: ignore[reportAttributeAccessIssue]
+            node.uv2 = []  # pyright: ignore[reportAttributeAccessIssue]
+            node.weights = []  # pyright: ignore[reportAttributeAccessIssue]
 
             if type_flags & NODE_SABER:
                 saber_verts = []
-                self.mdl.seek(MDL_OFFSET + off_saber_verts)
+                self.mdl.seek(MDL_OFFSET + off_saber_verts)  # pyright: ignore[reportPossiblyUnboundVariable]
                 for i in range(NUM_SABER_VERTS):
                     saber_verts.append([self.mdl.read_float() for _ in range(3)])
                 saber_tverts = []
@@ -593,15 +557,15 @@ class MdlReader:
                     saber_normals.append([self.mdl.read_float() for _ in range(3)])
 
                 for i in range(8):
-                    node.verts.append(saber_verts[i])
-                    node.normals.append(saber_normals[i])
-                    node.uv1.append(saber_tverts[i])
+                    node.verts.append(saber_verts[i])  # pyright: ignore[reportAttributeAccessIssue]
+                    node.normals.append(saber_normals[i])  # pyright: ignore[reportAttributeAccessIssue]
+                    node.uv1.append(saber_tverts[i])  # pyright: ignore[reportAttributeAccessIssue]
                 for i in range(88, 96):
-                    node.verts.append(saber_verts[i])
-                    node.normals.append(saber_normals[i])
-                    node.uv1.append(saber_tverts[i])
+                    node.verts.append(saber_verts[i])  # pyright: ignore[reportAttributeAccessIssue]
+                    node.normals.append(saber_normals[i])  # pyright: ignore[reportAttributeAccessIssue]
+                    node.uv1.append(saber_tverts[i])  # pyright: ignore[reportAttributeAccessIssue]
 
-            elif mdx_data_size > 0:
+            elif self.mdx is not None and mdx_data_size > 0:
                 for i in range(num_verts):
                     self.mdx.seek(mdx_offset + i * mdx_data_size + off_mdx_verts)
                     node.verts.append(tuple([self.mdx.read_float() for _ in range(3)]))
@@ -611,32 +575,23 @@ class MdlReader:
                             comp = self.mdx.read_uint32()
                             node.normals.append(self.decompress_vector_xbox(comp))
                         else:
-                            node.normals.append(
-                                tuple([self.mdx.read_float() for _ in range(3)])
-                            )
+                            node.normals.append(tuple([self.mdx.read_float() for _ in range(3)]))
                     if mdx_data_bitmap & MDX_FLAG_UV1:
                         self.mdx.seek(mdx_offset + i * mdx_data_size + off_mdx_uv1)
-                        node.uv1.append(
-                            tuple([self.mdx.read_float() for _ in range(2)])
-                        )
+                        node.uv1.append(tuple([self.mdx.read_float() for _ in range(2)]))
                     if mdx_data_bitmap & MDX_FLAG_UV2:
                         self.mdx.seek(mdx_offset + i * mdx_data_size + off_mdx_uv2)
-                        node.uv2.append(
-                            tuple([self.mdx.read_float() for _ in range(2)])
-                        )
+                        node.uv2.append(tuple([self.mdx.read_float() for _ in range(2)]))
                     if type_flags & NODE_SKIN:
-                        self.mdx.seek(
-                            mdx_offset + i * mdx_data_size + off_mdx_bone_weights
-                        )
+                        self.mdx.seek(mdx_offset + i * mdx_data_size + off_mdx_bone_weights)
                         bone_weights = [self.mdx.read_float() for _ in range(4)]
-                        self.mdx.seek(
-                            mdx_offset + i * mdx_data_size + off_mdx_bone_indices
-                        )
+                        self.mdx.seek(mdx_offset + i * mdx_data_size + off_mdx_bone_indices)
                         if self.xbox:
                             bone_indices = [self.mdx.read_uint16() for _ in range(4)]
                         else:
                             bone_indices = [
-                                int(self.mdx.read_float()) for _ in range(4)
+                                -1 if math.isnan(f) else int(f)
+                                for f in [self.mdx.read_float() for _ in range(4)]
                             ]
                         vert_weights = []
                         for i in range(4):
@@ -650,9 +605,7 @@ class MdlReader:
 
         if type_flags & NODE_DANGLY:
             self.mdl.seek(MDL_OFFSET + constraint_arr.offset)
-            node.constraints = [
-                self.mdl.read_float() for _ in range(constraint_arr.count)
-            ]
+            node.constraints = [self.mdl.read_float() for _ in range(constraint_arr.count)]  # pyright: ignore[reportAttributeAccessIssue]
 
         self.mdl.seek(MDL_OFFSET + children_arr.offset)
         child_offsets = [self.mdl.read_uint32() for _ in range(children_arr.count)]
@@ -662,7 +615,11 @@ class MdlReader:
 
         return node
 
-    def load_aabb(self, offset):
+    def load_aabb(self, offset: int):
+        # Avoid reading past EOF (e.g. K1/unfixed AABB layout or corrupt child offsets)
+        aabb_node_size = 6 * 4 + 4 + 4 + 4 + 4  # 6 floats + 2 offsets + face_idx + plane
+        if offset <= 0 or offset + aabb_node_size > self.mdl_size:
+            return
         self.mdl.seek(MDL_OFFSET + offset)
         bounding_box = [self.mdl.read_float() for _ in range(6)]
         off_child1 = self.mdl.read_uint32()
@@ -670,9 +627,9 @@ class MdlReader:
         face_idx = self.mdl.read_int32()
         most_significant_plane = self.mdl.read_uint32()
 
-        if off_child1 > 0:
+        if off_child1 > 0 and off_child1 + aabb_node_size <= self.mdl_size:
             self.load_aabb(off_child1)
-        if off_child2 > 0:
+        if off_child2 > 0 and off_child2 + aabb_node_size <= self.mdl_size:
             self.load_aabb(off_child2)
 
     def load_animations(self):
@@ -683,7 +640,7 @@ class MdlReader:
         for offset in offsets:
             self.load_animation(offset)
 
-    def load_animation(self, offset):
+    def load_animation(self, offset: int):
         self.mdl.seek(MDL_OFFSET + offset)
 
         fn_ptr1 = self.mdl.read_uint32()
@@ -714,8 +671,8 @@ class MdlReader:
                 event_name = self.mdl.read_c_string_up_to(32)
                 anim.events.append((time, event_name))
 
-        anim.root_node = self.load_anim_nodes(off_root_node, anim)
-        self.model.animations.append(anim)
+        anim.root_node = self.load_anim_nodes(off_root_node, anim)  # pyright: ignore[reportAttributeAccessIssue]
+        self.model.animations.append(anim)  # pyright: ignore[reportOptionalMemberAccess]
 
     def load_anim_nodes(self, offset, anim, parent=None):
         self.mdl.seek(MDL_OFFSET + offset)
@@ -733,11 +690,7 @@ class MdlReader:
         controller_data_arr = self.get_array_def()
 
         if name_index >= len(self.names):
-            raise RuntimeError(
-                "Animation node name index out of range: index={}, count={}".format(
-                    name_index, len(self.names)
-                )
-            )
+            raise RuntimeError("Animation node name index out of range: index={}, count={}".format(name_index, len(self.names)))
         name = self.names[name_index]
         node = AnimationNode(name)
         node.node_number = node_number
@@ -749,58 +702,31 @@ class MdlReader:
                 supernode = self.node_by_number[node_number]
                 controllers = self.load_controllers(controller_arr, controller_data_arr)
                 if CTRL_BASE_POSITION in controllers:
-                    node.keyframes["position"] = [
-                        row for row in controllers[CTRL_BASE_POSITION]
-                    ]
+                    node.keyframes["position"] = [row for row in controllers[CTRL_BASE_POSITION]]
                 if CTRL_BASE_ORIENTATION in controllers:
-                    orientations = [
-                        self.orientation_controller_to_quaternion(row[1:])
-                        for row in controllers[CTRL_BASE_ORIENTATION]
-                    ]
-                    node.keyframes["orientation"] = [
-                        [row[0]] + orientations[i]
-                        for i, row in enumerate(controllers[CTRL_BASE_ORIENTATION])
-                    ]
+                    orientations = [self.orientation_controller_to_quaternion(row[1:]) for row in controllers[CTRL_BASE_ORIENTATION]]
+                    node.keyframes["orientation"] = [[row[0]] + orientations[i] for i, row in enumerate(controllers[CTRL_BASE_ORIENTATION])]
                 if isinstance(supernode, TrimeshNode):
                     if CTRL_MESH_ALPHA in controllers:
-                        node.keyframes["alpha"] = [
-                            row for row in controllers[CTRL_MESH_ALPHA]
-                        ]
+                        node.keyframes["alpha"] = [row for row in controllers[CTRL_MESH_ALPHA]]
                     if CTRL_MESH_SCALE in controllers:
-                        node.keyframes["scale"] = [
-                            row for row in controllers[CTRL_MESH_SCALE]
-                        ]
+                        node.keyframes["scale"] = [row for row in controllers[CTRL_MESH_SCALE]]
                     if CTRL_MESH_SELFILLUMCOLOR in controllers:
-                        node.keyframes["selfillumcolor"] = [
-                            row for row in controllers[CTRL_MESH_SELFILLUMCOLOR]
-                        ]
+                        node.keyframes["selfillumcolor"] = [row for row in controllers[CTRL_MESH_SELFILLUMCOLOR]]
                 if isinstance(supernode, LightNode):
                     if CTRL_LIGHT_RADIUS in controllers:
-                        node.keyframes["radius"] = [
-                            row for row in controllers[CTRL_LIGHT_RADIUS]
-                        ]
+                        node.keyframes["radius"] = [row for row in controllers[CTRL_LIGHT_RADIUS]]
                     if CTRL_LIGHT_SHADOWRADIUS in controllers:
-                        node.keyframes["shadowradius"] = [
-                            row for row in controllers[CTRL_LIGHT_SHADOWRADIUS]
-                        ]
+                        node.keyframes["shadowradius"] = [row for row in controllers[CTRL_LIGHT_SHADOWRADIUS]]
                     if CTRL_LIGHT_VERTICALDISPLACEMENT in controllers:
-                        node.keyframes["verticaldisplacement"] = [
-                            row
-                            for row in controllers[
-                                CTRL_LIGHT_VERTICALDISPLACEMENT
-                            ]
-                        ]
+                        node.keyframes["verticaldisplacement"] = [row for row in controllers[CTRL_LIGHT_VERTICALDISPLACEMENT]]
                     if CTRL_LIGHT_MULTIPLIER in controllers:
-                        node.keyframes["multiplier"] = [
-                            row for row in controllers[CTRL_LIGHT_MULTIPLIER]
-                        ]
+                        node.keyframes["multiplier"] = [row for row in controllers[CTRL_LIGHT_MULTIPLIER]]
                     if CTRL_LIGHT_COLOR in controllers:
-                        node.keyframes["color"] = [
-                            row for row in controllers[CTRL_LIGHT_COLOR]
-                        ]
+                        node.keyframes["color"] = [row for row in controllers[CTRL_LIGHT_COLOR]]
                 if isinstance(supernode, EmitterNode):
                     for key in EMITTER_CONTROLLER_KEYS:
-                        if not key[0] in controllers:
+                        if key[0] not in controllers:
                             continue
                         node.keyframes[key[1]] = [row for row in controllers[key[0]]]
             else:
@@ -826,19 +752,15 @@ class MdlReader:
             num_columns = self.mdl.read_uint8()
             self.mdl.skip(3)  # padding
             keys.append(
-                ControllerKey(
+                ControllerKey(  # noqa: F405
                     ctrl_type, num_rows, timekeys_start, values_start, num_columns
                 )
             )
         controllers = dict()
         for key in keys:
-            self.mdl.seek(
-                MDL_OFFSET + controller_data_arr.offset + 4 * key.timekeys_start
-            )
+            self.mdl.seek(MDL_OFFSET + controller_data_arr.offset + 4 * key.timekeys_start)
             timekeys = [self.mdl.read_float() for _ in range(key.num_rows)]
-            self.mdl.seek(
-                MDL_OFFSET + controller_data_arr.offset + 4 * key.values_start
-            )
+            self.mdl.seek(MDL_OFFSET + controller_data_arr.offset + 4 * key.values_start)
             if key.ctrl_type == CTRL_BASE_ORIENTATION and key.num_columns == 2:
                 integral = True
                 num_columns = 1
@@ -848,37 +770,31 @@ class MdlReader:
                 bezier = key.num_columns & CTRL_FLAG_BEZIER
                 if bezier:
                     num_columns *= 3
-            values = [
-                self.mdl.read_uint32() if integral else self.mdl.read_float()
-                for _ in range(num_columns * key.num_rows)
-            ]
-            controllers[key.ctrl_type] = [
-                [timekeys[i]] + values[i * num_columns : i * num_columns + num_columns]
-                for i in range(key.num_rows)
-            ]
+            values = [self.mdl.read_uint32() if integral else self.mdl.read_float() for _ in range(num_columns * key.num_rows)]
+            controllers[key.ctrl_type] = [[timekeys[i]] + values[i * num_columns : i * num_columns + num_columns] for i in range(key.num_rows)]
         return controllers
 
-    def get_node_type(self, flags):
-        if flags & NODE_SABER:
+    def get_node_type(self, flags: int) -> str:
+        if flags & NODE_SABER:  # noqa: F405
             return NodeType.LIGHTSABER
-        if flags & NODE_AABB:
+        if flags & NODE_AABB:  # noqa: F405
             return NodeType.AABB
-        if flags & NODE_DANGLY:
+        if flags & NODE_DANGLY:  # noqa: F405
             return NodeType.DANGLYMESH
-        if flags & NODE_SKIN:
+        if flags & NODE_SKIN:  # noqa: F405
             return NodeType.SKIN
-        if flags & NODE_MESH:
+        if flags & NODE_MESH:  # noqa: F405
             return NodeType.TRIMESH
-        if flags & NODE_REFERENCE:
+        if flags & NODE_REFERENCE:  # noqa: F405
             return NodeType.REFERENCE
-        if flags & NODE_EMITTER:
+        if flags & NODE_EMITTER:  # noqa: F405
             return NodeType.EMITTER
-        if flags & NODE_LIGHT:
+        if flags & NODE_LIGHT:  # noqa: F405
             return NodeType.LIGHT
         return NodeType.DUMMY
 
-    def new_node(self, name, node_type):
-        switch = {
+    def new_node(self, name: str, node_type: str) -> BaseNode:
+        switch: dict[str, type[BaseNode]] = {
             NodeType.DUMMY: DummyNode,
             NodeType.REFERENCE: ReferenceNode,
             NodeType.TRIMESH: TrimeshNode,
@@ -894,8 +810,8 @@ class MdlReader:
         except KeyError:
             raise RuntimeError("Invalid node type")
 
-    def orientation_controller_to_quaternion(self, values):
-        num_columns = len(values)
+    def orientation_controller_to_quaternion(self, values: list[float]) -> list[float]:
+        num_columns: int = len(values)
         if num_columns == 4:
             return values
         elif num_columns == 1:
@@ -910,22 +826,18 @@ class MdlReader:
                 w = 0.0
             return [x, y, z, w]
         else:
-            raise RuntimeError(
-                "Unsupported number of orientation columns: " + str(num_columns)
-            )
+            raise RuntimeError("Unsupported number of orientation columns: " + str(num_columns))
 
-    def get_array_def(self):
+    def get_array_def(self) -> ArrayDefinition:
         offset = self.mdl.read_uint32()
         count1 = self.mdl.read_uint32()
         count2 = self.mdl.read_uint32()
         if count1 != count2:
-            raise RuntimeError(
-                "Array count mismatch: count1={}, count2={}".format(count1, count2)
-            )
+            raise RuntimeError("Array count mismatch: count1={}, count2={}".format(count1, count2))
 
         return ArrayDefinition(offset, count1)
 
-    def decompress_vector_xbox(self, comp):
+    def decompress_vector_xbox(self, comp: int) -> tuple[float, float, float]:
         tmp = comp & 0x7FF
         if tmp < 1024:
             x = tmp / 1023.0

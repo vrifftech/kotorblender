@@ -15,6 +15,9 @@
 #  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
 # ##### END GPL LICENSE BLOCK #####
+from __future__ import annotations
+
+from typing import ClassVar
 
 import bpy
 
@@ -24,14 +27,18 @@ from ..utils import is_mdl_root, find_objects
 
 
 class KB_OT_rebuild_all_materials(bpy.types.Operator):
-    bl_idname = "kb.rebuild_all_materials"
-    bl_label = "Rebuild All Materials"
+    bl_idname: ClassVar[str] = "kb.rebuild_all_materials"
+    bl_label: ClassVar[str] = "Rebuild All Materials"
+    bl_description: ClassVar[str] = "Rebuild materials for all meshes in the selected KotOR model"
 
     @classmethod
-    def poll(cls, context):
-        return is_mdl_root(context.object)
+    def poll(cls, context: bpy.types.Context) -> bool:
+        if not context.object or not is_mdl_root(context.object):
+            cls.poll_message_set(context, "Select a KotOR model object")
+            return False
+        return True
 
-    def execute(self, context):
+    def execute(self, context: bpy.types.Context) -> set[str]:
         objects = find_objects(
             context.object,
             lambda obj: obj.type == "MESH"

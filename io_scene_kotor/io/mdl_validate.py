@@ -17,19 +17,30 @@
 # ##### END GPL LICENSE BLOCK #####
 
 import re
+from typing import Generator
+
+import bpy
 
 from ..constants import MeshType
 from ..utils import is_dwk_root, is_exported_to_mdl, is_null, is_pwk_root
 
 
-def _normalized_export_name(obj):
+class _Op:
+    def report(self, level: str | None, message: str) -> None:
+        tag = next(iter(level)) if level else "INFO"
+        print(f"    [{tag}] {message}")
+
+
+_op = _Op()
+
+def _normalized_export_name(obj: bpy.types.Object) -> str:
     name = obj.name
     if re.match(r".+\.\d{3}$", name):
         name = name[:-4]
     return name
 
 
-def _iter_exportable_objects(root_obj):
+def _iter_exportable_objects(root_obj: bpy.types.Object) -> Generator[bpy.types.Object, None, None]:
     stack = [root_obj]
     while stack:
         obj = stack.pop()
@@ -40,26 +51,29 @@ def _iter_exportable_objects(root_obj):
         stack.extend(reversed(obj.children))
 
 
-def validate_mdl_export(operator, root_obj):
+def validate_mdl_export(operator: _Op, root_obj: bpy.types.Object) -> None:
     export_objects = list(_iter_exportable_objects(root_obj))
-    exported_names = [_normalized_export_name(obj) for obj in export_objects]
-    lowered_names = [name.lower() for name in exported_names]
+    # Use actual Blender object names for duplicate check so MDLs with duplicate
+    # node names (e.g. community models) roundtrip: Blender deduplicates to .001, .002.
+    exported_names = [obj.name for obj in export_objects]
+    lowered_actual = [name.lower() for name in exported_names]
+    normalized_for_animroot = [_normalized_export_name(obj) for obj in export_objects]
 
-    # Duplicate names under a case-insensitive check.
-    duplicate_names = []
-    seen_names = set()
-    for name in lowered_names:
-        if name in seen_names and name not in duplicate_names:
-            duplicate_names.append(name)
-        seen_names.add(name)
-    if duplicate_names:
-        duplicates = ", ".join(sorted(duplicate_names))
-        raise RuntimeError(
-            "Duplicate exported node names are not allowed: {}".format(duplicates)
-        )
+    # Duplicate check: only actual duplicate Blender names (same string) are invalid.
+    seen_actual = set()
+    for name in lowered_actual:
+        if name in seen_actual:
+            raise RuntimeError(
+                "Duplicate exported node names are not allowed: {}".format(name)
+            )
+        seen_actual.add(name)
 
-    # Invalid names.
-    for obj, name in zip(export_objects, exported_names):
+    # For animroot we accept either actual or normalized name.
+    seen_names = set(lowered_actual) | {n.lower() for n in normalized_for_animroot}
+
+    # Invalid names (validate the name that gets written: obj.name).
+    for obj in export_objects:
+        name = obj.name
         if not name:
             raise RuntimeError("Object '{}' has an empty exported name".format(obj.name))
         if " " in name or "\t" in name:
@@ -70,6 +84,7 @@ def validate_mdl_export(operator, root_obj):
             raise RuntimeError(
                 "Object '{}' has the reserved exported name 'root'".format(obj.name)
             )
+        # Node names have no 16-char limit in the binary format; only root model name does.
 
     if len(_normalized_export_name(root_obj)) > 16:
         raise RuntimeError(

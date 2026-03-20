@@ -24,21 +24,25 @@ from ....utils import is_mdl_root
 class KB_OT_delete_anim_event(bpy.types.Operator):
     bl_idname = "kb.delete_anim_event"
     bl_label = "Delete event from the animation"
+    bl_description = "Remove the selected event from the current animation"
     bl_options = {"UNDO"}
 
     @classmethod
     def poll(cls, context):
         obj = context.object
-        if not is_mdl_root(obj):
+        if not obj or not is_mdl_root(obj):
+            cls.poll_message_set(context, "Select a KotOR model object")
             return False
-
         anim_list = obj.kb.anim_list
         anim_list_idx = obj.kb.anim_list_idx
         if anim_list_idx < 0 or anim_list_idx >= len(anim_list):
+            cls.poll_message_set(context, "Select an animation in the list")
             return False
-
         anim = anim_list[anim_list_idx]
-        return anim.event_list_idx >= 0 and anim.event_list_idx < len(anim.event_list)
+        if anim.event_list_idx < 0 or anim.event_list_idx >= len(anim.event_list):
+            cls.poll_message_set(context, "Select an event in the animation")
+            return False
+        return True
 
     def execute(self, context):
         mdl_root = context.object

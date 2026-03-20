@@ -16,27 +16,34 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
+from __future__ import annotations
+
+from typing import ClassVar
+
 import bpy
 
 from ...utils import is_mdl_root
 
 
 class KB_OT_delete_animation(bpy.types.Operator):
-    bl_idname = "kb.delete_animation"
-    bl_label = "Delete animation from the list"
+    bl_idname: ClassVar[str] = "kb.delete_animation"
+    bl_label: ClassVar[str] = "Delete animation from the list"
+    bl_description: ClassVar[str] = "Remove the selected animation from the KotOR model's animation list"
 
     @classmethod
-    def poll(cls, context):
+    def poll(cls, context: bpy.types.Context) -> bool:
         obj = context.object
-        if not is_mdl_root(obj):
+        if not obj or not is_mdl_root(obj):
+            cls.poll_message_set(context, "Select a KotOR model object")
             return False
-
         anim_list = obj.kb.anim_list
         anim_list_idx = obj.kb.anim_list_idx
+        if anim_list_idx < 0 or anim_list_idx >= len(anim_list):
+            cls.poll_message_set(context, "Select an animation in the list")
+            return False
+        return True
 
-        return anim_list_idx >= 0 and anim_list_idx < len(anim_list)
-
-    def execute(self, context):
+    def execute(self, context: bpy.types.Context) -> set[str]:
         mdl_root = context.object
         anim_list = mdl_root.kb.anim_list
         anim_list_idx = mdl_root.kb.anim_list_idx

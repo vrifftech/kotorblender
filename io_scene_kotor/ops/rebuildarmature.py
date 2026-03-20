@@ -15,6 +15,9 @@
 #  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
 # ##### END GPL LICENSE BLOCK #####
+from __future__ import annotations
+
+from typing import ClassVar
 
 import bpy
 
@@ -24,17 +27,20 @@ from ..utils import is_mdl_root
 
 
 class KB_OT_rebuild_armature(bpy.types.Operator):
-    bl_idname = "kb.rebuild_armature"
-    bl_label = "Rebuild Armature"
-    bl_description = "Rebuild an armature from bone objects"
+    bl_idname: ClassVar[str] = "kb.rebuild_armature"
+    bl_label: ClassVar[str] = "Rebuild Armature"
+    bl_description: ClassVar[str] = "Rebuild an armature from bone objects"
 
     @classmethod
-    def poll(cls, context):
-        return (
-            is_mdl_root(context.object)
-            and context.object.kb.classification == Classification.CHARACTER
-        )
+    def poll(cls, context: bpy.types.Context) -> bool:
+        if not context.object or not is_mdl_root(context.object):
+            cls.poll_message_set(context, "Select a KotOR model object")
+            return False
+        if context.object.kb.classification != Classification.CHARACTER:
+            cls.poll_message_set(context, "Select a KotOR character model")
+            return False
+        return True
 
-    def execute(self, context):
+    def execute(self, context: bpy.types.Context) -> set[str]:
         armature.rebuild_armature(context.object)
         return {"FINISHED"}

@@ -28,13 +28,14 @@ DEF_LIGHTMAP_SEARCH_PATHS = "lightmaps;../lightmaps"
 class KotorBlenderAddonPreferences(AddonPreferences):
     bl_idname = PACKAGE_NAME
 
-    texture_search_paths: StringProperty(
+    # Use assignment only (no type annotation) to avoid typing.get_type_hints failing in Blender 4.4+
+    texture_search_paths = StringProperty(
         name="Texture Search Paths",
         description="Semicolon-separated list of paths. Can be relative to the imported layout or absolute.",
         default=DEF_TEXTURE_SEARCH_PATHS,
     )
 
-    lightmap_search_paths: StringProperty(
+    lightmap_search_paths = StringProperty(
         name="Lightmap Search Paths",
         description="Semicolon-separated list of paths. Can be relative to the imported layout or absolute.",
         default=DEF_LIGHTMAP_SEARCH_PATHS,
@@ -42,5 +43,6 @@ class KotorBlenderAddonPreferences(AddonPreferences):
 
     def draw(self, context):
         layout = self.layout
+        layout.label(text="Paths used when resolving textures and lightmaps for imported models (semicolon-separated).")
         layout.prop(self, "texture_search_paths")
         layout.prop(self, "lightmap_search_paths")

@@ -35,8 +35,10 @@ if MODULE not in bpy.context.preferences.addons:
 from io_scene_kotor.aabb import (
     BoundingBox,
     compute_bounding_box,
+    find_split_axis,
     generate_tree,
     new_aabb_node,
+    split_faces,
 )
 
 # ---------------------------------------------------------------------------
@@ -138,6 +140,31 @@ def test_bounding_box_min_max():
         print("  PASS test_bounding_box_min_max")
     else:
         print(f"  FAIL test_bounding_box_min_max: min={bb.min}, max={bb.max}")
+    return ok
+
+
+def test_compute_bounding_box_two_faces_shared_vertex():
+    """compute_bounding_box with two faces sharing a vertex: min/max/center span combined verts."""
+    faces = [
+        _tri(0, (0, 0, 0), (2, 0, 0), (0, 2, 0)),
+        _tri(1, (0, 0, 0), (0, 2, 0), (-1, 0, 0)),
+    ]
+    bb = compute_bounding_box(faces)
+    # Face 0 center (2/3, 2/3, 0), face 1 center (-1/3, 2/3, 0) -> center (1/6, 2/3, 0)
+    ok = (
+        _float_eq(bb.min.x, -1.0)
+        and _float_eq(bb.min.y, 0.0)
+        and _float_eq(bb.min.z, 0.0)
+        and _float_eq(bb.max.x, 2.0)
+        and _float_eq(bb.max.y, 2.0)
+        and _float_eq(bb.max.z, 0.0)
+        and _float_eq(bb.center.x, 1.0 / 6.0)
+        and _float_eq(bb.center.y, 2.0 / 3.0)
+    )
+    if ok:
+        print("  PASS test_compute_bounding_box_two_faces_shared_vertex")
+    else:
+        print(f"  FAIL test_compute_bounding_box_two_faces_shared_vertex: min={bb.min}, max={bb.max}, center={bb.center}")
     return ok
 
 
@@ -267,6 +294,21 @@ def test_aabb_node_structure():
     return ok
 
 
+def test_split_faces_degenerate_returns_consistent_partition():
+    """split_faces with all centers on split plane returns non-crashing left/right partition."""
+    faces = [_tri(i, (i, 0, 0), (i + 1, 0, 0), (i, 0.01, 0)) for i in range(4)]
+    bb = compute_bounding_box(faces)
+    axis = find_split_axis(bb, faces)
+    left, right, actual_axis = split_faces(bb, faces, axis)
+    total = len(left) + len(right)
+    ok = total == 4 and (len(left) > 0 or len(right) > 0)
+    if ok:
+        print("  PASS test_split_faces_degenerate_returns_consistent_partition")
+    else:
+        print(f"  FAIL test_split_faces_degenerate_returns_consistent_partition: left={len(left)}, right={len(right)}")
+    return ok
+
+
 # ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
@@ -280,6 +322,7 @@ def run_tests():
         test_four_face_tree,
         test_general_n_face_tree,
         test_bounding_box_min_max,
+        test_compute_bounding_box_two_faces_shared_vertex,
         test_bounding_box_longest_axis_x,
         test_bounding_box_longest_axis_y,
         test_bounding_box_longest_axis_z,
@@ -288,6 +331,7 @@ def run_tests():
         test_interior_node_children_point_into_tree,
         test_degenerate_coplanar_faces,
         test_aabb_node_structure,
+        test_split_faces_degenerate_returns_consistent_partition,
     ]
     results = [t() for t in tests]
     passed = sum(results)

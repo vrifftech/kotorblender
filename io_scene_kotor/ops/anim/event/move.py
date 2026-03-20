@@ -24,6 +24,7 @@ from ....utils import is_mdl_root
 class KB_OT_move_anim_event(bpy.types.Operator):
     bl_idname = "kb.move_anim_event"
     bl_label = "Move event within the list"
+    bl_description = "Reorder the selected animation event up or down in the list"
     bl_options = {"UNDO"}
 
     direction: bpy.props.EnumProperty(items=(("UP", "Up", ""), ("DOWN", "Down", "")))
@@ -31,22 +32,23 @@ class KB_OT_move_anim_event(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         obj = context.object
-        if not is_mdl_root(obj):
+        if not obj or not is_mdl_root(obj):
+            cls.poll_message_set(context, "Select a KotOR model object")
             return False
-
         anim_list = obj.kb.anim_list
         anim_list_idx = obj.kb.anim_list_idx
         if anim_list_idx < 0 or anim_list_idx >= len(anim_list):
+            cls.poll_message_set(context, "Select an animation in the list")
             return False
-
         anim = anim_list[anim_list_idx]
         num_events = len(anim.event_list)
-
-        return (
-            anim.event_list_idx >= 0
-            and anim.event_list_idx < num_events
-            and num_events >= 2
-        )
+        if anim.event_list_idx < 0 or anim.event_list_idx >= num_events:
+            cls.poll_message_set(context, "Select an event in the animation")
+            return False
+        if num_events < 2:
+            cls.poll_message_set(context, "At least two events required to reorder")
+            return False
+        return True
 
     def execute(self, context):
         mdl_root = context.object

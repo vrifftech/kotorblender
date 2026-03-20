@@ -11,8 +11,8 @@
 #   test-registration  test-gff  test-pth  test-lyt
 #   test-aabb          test-constants      test-mdl
 
-.PHONY: build test test-e2e lint syntax-check clean
-.PHONY: test-registration test-gff test-pth test-lyt test-aabb test-constants test-mdl
+.PHONY: build test test-e2e test-unit lint syntax-check clean
+.PHONY: test-registration test-gff test-pth test-lyt test-aabb test-constants test-mdl test-community-mdl
 
 BLENDER ?= blender
 
@@ -24,6 +24,10 @@ build:
 
 test:
 	BLENDER="$(BLENDER)" bash test/run_blender_tests.sh
+
+# Unit tests (no Blender): format, constants, options. Discoverable by pytest and VS Code Test Explorer.
+test-unit:
+	python3 -m pytest test/unit -v
 
 test-registration:
 	$(BLENDER) --background --python test/blender/test_registration.py
@@ -45,6 +49,9 @@ test-constants:
 
 test-mdl:
 	$(BLENDER) --background --python test/blender/test_mdl_minimal.py
+
+test-community-mdl:
+	$(BLENDER) --background --python test/blender/test_community_mdl_load.py
 
 # Requires extracted KotOR game assets; set DATA_DIR to their location.
 test-e2e:

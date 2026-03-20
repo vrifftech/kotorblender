@@ -30,15 +30,20 @@ class KB_OT_armature_apply_keyframes(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return (
-            is_mdl_root(context.object)
-            and context.object.kb.classification == Classification.CHARACTER
-            and find_objects(
-                context.object,
-                lambda obj: is_skin_mesh(obj)
-                and any(mod.type == "ARMATURE" for mod in obj.modifiers),
-            )
-        )
+        if not context.object or not is_mdl_root(context.object):
+            cls.poll_message_set(context, "Select a KotOR model object")
+            return False
+        if context.object.kb.classification != Classification.CHARACTER:
+            cls.poll_message_set(context, "Select a KotOR character model")
+            return False
+        if not find_objects(
+            context.object,
+            lambda obj: is_skin_mesh(obj)
+            and any(mod.type == "ARMATURE" for mod in obj.modifiers),
+        ):
+            cls.poll_message_set(context, "Model must have a skinned mesh with an armature modifier")
+            return False
+        return True
 
     def execute(self, context):
         stack = [context.object]

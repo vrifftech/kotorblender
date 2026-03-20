@@ -15,8 +15,10 @@
 #  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
 # ##### END GPL LICENSE BLOCK #####
+from __future__ import annotations
 
 import struct
+from typing import BinaryIO, Literal
 
 
 class SeekOrigin:
@@ -26,49 +28,54 @@ class SeekOrigin:
 
 
 class BinaryReader:
-    def __init__(self, path, byteorder="little"):
-        self.file = open(path, "rb")
-        self.byteorder = byteorder
+    def __init__(self, path: str, byteorder: Literal["little", "big"] = "little"):
+        self.file: BinaryIO = open(path, "rb")
+        self.byteorder: Literal["little", "big"] = byteorder
 
     def __del__(self):
-        self.file.close()
+        file_handle = getattr(self, "file", None)
+        if file_handle is not None:
+            try:
+                file_handle.close()
+            except Exception:
+                pass
 
-    def seek(self, offset, origin=SeekOrigin.BEGIN):
+    def seek(self, offset: int, origin: int = SeekOrigin.BEGIN):
         self.file.seek(offset, origin)
 
-    def skip(self, offset):
+    def skip(self, offset: int):
         self.file.seek(offset, SeekOrigin.CURRENT)
 
-    def tell(self):
+    def tell(self) -> int:
         return self.file.tell()
 
-    def read_int8(self):
+    def read_int8(self) -> int:
         return int.from_bytes(self.file.read(1), self.byteorder, signed=True)
 
-    def read_int16(self):
+    def read_int16(self) -> int:
         return int.from_bytes(self.file.read(2), self.byteorder, signed=True)
 
-    def read_int32(self):
+    def read_int32(self) -> int:
         return int.from_bytes(self.file.read(4), self.byteorder, signed=True)
 
-    def read_uint8(self):
+    def read_uint8(self) -> int:
         return int.from_bytes(self.file.read(1), self.byteorder, signed=False)
 
-    def read_uint16(self):
+    def read_uint16(self) -> int:
         return int.from_bytes(self.file.read(2), self.byteorder, signed=False)
 
-    def read_uint32(self):
+    def read_uint32(self) -> int:
         return int.from_bytes(self.file.read(4), self.byteorder, signed=False)
 
-    def read_float(self):
+    def read_float(self) -> float:
         bo_literal = ">" if self.byteorder == "big" else "<"
         [val] = struct.unpack(bo_literal + "f", self.file.read(4))
         return val
 
-    def read_string(self, len):
+    def read_string(self, len: int) -> str:
         return self.file.read(len).decode("utf-8")
 
-    def read_c_string(self):
+    def read_c_string(self) -> str:
         str = ""
         while True:
             raw = self.file.read(1)
@@ -80,7 +87,7 @@ class BinaryReader:
             str += ch
         return str
 
-    def read_c_string_up_to(self, max_len):
+    def read_c_string_up_to(self, max_len: int) -> str:
         str = ""
         len = max_len
         while len > 0:
@@ -93,5 +100,5 @@ class BinaryReader:
             self.file.seek(len, 1)
         return str
 
-    def read_bytes(self, count):
+    def read_bytes(self, count: int) -> bytes:
         return self.file.read(count)

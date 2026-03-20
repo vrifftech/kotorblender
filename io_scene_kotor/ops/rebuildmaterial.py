@@ -16,6 +16,10 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
+from __future__ import annotations
+
+from typing import ClassVar
+
 import bpy
 
 from ..constants import MeshType
@@ -23,14 +27,24 @@ from ..scene import material
 
 
 class KB_OT_rebuild_material(bpy.types.Operator):
-    bl_idname = "kb.rebuild_material"
-    bl_label = "Rebuild Material"
+    bl_idname: ClassVar[str] = "kb.rebuild_material"
+    bl_label: ClassVar[str] = "Rebuild Material"
+    bl_description: ClassVar[str] = "Rebuild the material for the selected mesh (textures, lightmap, shader graph)"
 
     @classmethod
-    def poll(cls, context):
+    def poll(cls, context: bpy.types.Context) -> bool:
         obj = context.object
-        return obj and obj.type == "MESH" and obj.kb.meshtype not in [MeshType.EMITTER]
+        if not obj:
+            cls.poll_message_set(context, "Select an object")
+            return False
+        if obj.type != "MESH":
+            cls.poll_message_set(context, "Select a mesh object")
+            return False
+        if obj.kb.meshtype == MeshType.EMITTER:
+            cls.poll_message_set(context, "Cannot rebuild material on emitter mesh")
+            return False
+        return True
 
-    def execute(self, context):
+    def execute(self, context: bpy.types.Context) -> set[str]:
         material.rebuild_object_materials(context.object)
         return {"FINISHED"}

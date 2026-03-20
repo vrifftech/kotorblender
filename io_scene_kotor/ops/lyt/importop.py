@@ -30,6 +30,7 @@ from ...utils import logger, semicolon_separated_to_absolute_paths
 class KB_OT_import_lyt(bpy.types.Operator, ImportHelper):
     bl_idname = "kb.lytimport"
     bl_label = "Import KotOR LYT"
+    bl_description = "Import a KotOR area layout file (.lyt) with room and instance references"
     bl_options = {"UNDO"}
 
     filename_ext = ".lyt"

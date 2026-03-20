@@ -7,6 +7,7 @@ sanity checks.
 Run with:
     blender --background --python test/blender/test_mdl_validation.py
 """
+from __future__ import annotations
 
 import os
 import sys
@@ -20,15 +21,15 @@ if WORKSPACE_ROOT not in sys.path:
     sys.path.insert(0, WORKSPACE_ROOT)
 
 MODULE = "bl_ext.user_default.io_scene_kotor"
-if MODULE not in bpy.context.preferences.addons:
+if MODULE not in bpy.context.preferences.addons:  # pyright: ignore[reportOptionalMemberAccess]
     bpy.ops.preferences.addon_enable(module=MODULE)
 
-from io_scene_kotor.constants import Classification, DummyType, ExportOptions, MeshType
-from io_scene_kotor.io.mdl import save_mdl
+from io_scene_kotor.constants import Classification, DummyType, ExportOptions, MeshType  # noqa: E402
+from io_scene_kotor.io.mdl import save_mdl  # noqa: E402
 
 
 class _Op:
-    def report(self, level, message):
+    def report(self, level: str | None, message: str) -> None:
         tag = next(iter(level)) if level else "INFO"
         print(f"    [{tag}] {message}")
 
@@ -36,7 +37,7 @@ class _Op:
 _op = _Op()
 
 
-def _clear_scene():
+def _clear_scene() -> None:
     for obj in list(bpy.data.objects):
         bpy.data.objects.remove(obj, do_unlink=True)
     for mesh in list(bpy.data.meshes):
@@ -45,19 +46,19 @@ def _clear_scene():
         bpy.data.materials.remove(mat)
 
 
-def _make_mdl_root(name="testmodel"):
+def _make_mdl_root(name: str = "testmodel") -> bpy.types.Object:
     root = bpy.data.objects.new(name, None)
-    root.kb.dummytype = DummyType.MDLROOT
-    root.kb.classification = Classification.OTHER
-    root.kb.animscale = 1.0
-    root.kb.node_number = 1
-    root.kb.export_order = 0
+    root.kb.dummytype = DummyType.MDLROOT  # pyright: ignore[reportAttributeAccessIssue]
+    root.kb.classification = Classification.OTHER  # pyright: ignore[reportAttributeAccessIssue]
+    root.kb.animscale = 1.0  # pyright: ignore[reportAttributeAccessIssue]
+    root.kb.node_number = 1  # pyright: ignore[reportAttributeAccessIssue]
+    root.kb.export_order = 0  # pyright: ignore[reportAttributeAccessIssue]
     root.rotation_mode = "QUATERNION"
-    bpy.context.collection.objects.link(root)
+    bpy.context.collection.objects.link(root)  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
     return root
 
 
-def _make_mesh(name, root, verts=None, faces=None, node_number=2):
+def _make_mesh(name: str, root: bpy.types.Object, verts: list[tuple[float, float, float]] | None = None, faces: list[tuple[int, int, int]] | None = None, node_number: int = 2) -> bpy.types.Object:
     verts = verts if verts is not None else [(0, 0, 0), (1, 0, 0), (0, 1, 0)]
     faces = faces if faces is not None else [(0, 1, 2)]
     mesh = bpy.data.meshes.new(name)
@@ -77,7 +78,7 @@ def _make_mesh(name, root, verts=None, faces=None, node_number=2):
     return obj
 
 
-def _export(root):
+def _export(root: bpy.types.Object) -> tuple[str, str]:
     bpy.ops.object.select_all(action="DESELECT")
     root.select_set(True)
     bpy.context.view_layer.objects.active = root
@@ -92,14 +93,15 @@ def _export(root):
     return path, path[:-4] + ".mdx"
 
 
-def _cleanup_paths(*paths):
+def _cleanup_paths(*paths: str) -> None:
     for path in paths:
         if os.path.exists(path):
             os.unlink(path)
 
 
-def _expect_export_failure(root, expected_substring):
-    path = mdx_path = None
+def _expect_export_failure(root: bpy.types.Object, expected_substring: str) -> bool:
+    path: str | None = None
+    mdx_path: str | None = None
     try:
         path, mdx_path = _export(root)
     except RuntimeError as exc:
@@ -120,20 +122,32 @@ def _expect_export_failure(root, expected_substring):
             _cleanup_paths(*(p for p in (path, mdx_path) if p))
 
 
-def test_duplicate_name_validation():
+def test_deduplicated_names_allowed():
+    """Blender-deduplicated names (dup, dup.001) are distinct and export successfully."""
     _clear_scene()
     root = _make_mdl_root("dup_root")
     child1 = bpy.data.objects.new("dup", None)
     child1.parent = root
+    child1.rotation_mode = "QUATERNION"
+    child1.kb.dummytype = DummyType.NONE
     child1.kb.node_number = 2
     child1.kb.export_order = 1
     bpy.context.collection.objects.link(child1)
     child2 = bpy.data.objects.new("dup.001", None)
     child2.parent = root
+    child2.rotation_mode = "QUATERNION"
+    child2.kb.dummytype = DummyType.NONE
     child2.kb.node_number = 3
     child2.kb.export_order = 2
     bpy.context.collection.objects.link(child2)
-    return _expect_export_failure(root, "Duplicate exported node names")
+    try:
+        path, mdx_path = _export(root)
+        _cleanup_paths(path, mdx_path)
+        print("  PASS deduplicated names (dup, dup.001) export successfully")
+        return True
+    except RuntimeError as exc:
+        print(f"  FAIL export failed: {exc}")
+        return False
 
 
 def test_missing_animroot_validation():
@@ -148,7 +162,7 @@ def test_bitmap_length_validation():
     _clear_scene()
     root = _make_mdl_root("bitmap_root")
     mesh = _make_mesh("bitmap_mesh", root)
-    mesh.kb.bitmap = "texture_name_too_long"
+    mesh.kb.bitmap = "texture_name_too_long"  # >16 chars triggers texture name limit
     return _expect_export_failure(root, "longer than 16 characters")
 
 
@@ -162,7 +176,7 @@ def test_zero_face_mesh_validation():
 def run_tests():
     print("\n=== test_mdl_validation.py ===")
     tests = [
-        test_duplicate_name_validation,
+        test_deduplicated_names_allowed,
         test_missing_animroot_validation,
         test_bitmap_length_validation,
         test_zero_face_mesh_validation,

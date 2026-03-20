@@ -11,4 +11,5 @@
 # Upgrade to fake-bpy-module-4.3 or fake-bpy-module-5.0 if testing newer targets.
 
 fake-bpy-module-4.2
+pytest
 ruff

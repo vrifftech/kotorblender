@@ -24,10 +24,14 @@ from ...utils import is_path_point
 class KB_OT_add_path_connection(bpy.types.Operator):
     bl_idname = "kb.add_path_connection"
     bl_label = "Add KotOR Path Connection"
+    bl_description = "Add a new connection from this path point to another in the path graph"
 
     @classmethod
     def poll(cls, context):
-        return is_path_point(context.object)
+        if not is_path_point(context.object):
+            cls.poll_message_set(context, "Select a KotOR path point object")
+            return False
+        return True
 
     def execute(self, context):
         context.object.kb.path_connection_list.add()

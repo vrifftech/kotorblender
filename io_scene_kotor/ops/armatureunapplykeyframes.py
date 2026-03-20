@@ -16,6 +16,8 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
+from __future__ import annotations
+
 import bpy
 
 from ..constants import Classification
@@ -29,18 +31,23 @@ class KB_OT_armature_unapply_keyframes(bpy.types.Operator):
     bl_description = "Recreate bone object keyframes from armature"
 
     @classmethod
-    def poll(cls, context):
-        return (
-            is_mdl_root(context.object)
-            and context.object.kb.classification == Classification.CHARACTER
-            and find_objects(
-                context.object,
-                lambda obj: is_skin_mesh(obj)
-                and any(mod.type == "ARMATURE" for mod in obj.modifiers),
-            )
-        )
+    def poll(cls, context: bpy.types.Context) -> bool:
+        if not context.object or not is_mdl_root(context.object):
+            cls.poll_message_set(context, "Select a KotOR model object")
+            return False
+        if context.object.kb.classification != Classification.CHARACTER:
+            cls.poll_message_set(context, "Select a KotOR character model")
+            return False
+        if not find_objects(
+            context.object,
+            lambda obj: is_skin_mesh(obj)
+            and any(mod.type == "ARMATURE" for mod in obj.modifiers),
+        ):
+            cls.poll_message_set(context, "Model must have a skinned mesh with an armature modifier")
+            return False
+        return True
 
-    def execute(self, context):
+    def execute(self, context: bpy.types.Context) -> set[str]:
         stack = [context.object]
         while stack:
             obj = stack.pop()

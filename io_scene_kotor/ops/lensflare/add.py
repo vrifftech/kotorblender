@@ -24,11 +24,21 @@ from ...constants import NULL
 class KB_OT_add_lens_flare(bpy.types.Operator):
     bl_idname = "kb.add_lens_flare"
     bl_label = "Add lens flare to the list"
+    bl_description = "Add a new lens flare entry to the light's flare list"
 
     @classmethod
     def poll(cls, context):
         obj = context.object
-        return obj and obj.type == "LIGHT" and obj.kb.lensflares
+        if not obj:
+            cls.poll_message_set(context, "Select an object")
+            return False
+        if obj.type != "LIGHT":
+            cls.poll_message_set(context, "Select a light object")
+            return False
+        if not obj.kb.lensflares:
+            cls.poll_message_set(context, "Light must have lens flares enabled")
+            return False
+        return True
 
     def execute(self, context):
         flare = context.object.kb.flare_list.add()

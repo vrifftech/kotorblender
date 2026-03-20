@@ -27,6 +27,7 @@ from ...utils import logger
 class KB_OT_export_lyt(bpy.types.Operator, ExportHelper):
     bl_idname = "kb.lytexport"
     bl_label = "Export KotOR LYT"
+    bl_description = "Export the current scene as a KotOR area layout file (.lyt)"
 
     filename_ext = ".lyt"
 

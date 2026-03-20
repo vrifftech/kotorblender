@@ -27,6 +27,7 @@ from ...utils import logger
 class KB_OT_export_pth(bpy.types.Operator, ExportHelper):
     bl_idname = "kb.pthexport"
     bl_label = "Export KotOR PTH"
+    bl_description = "Export path point objects to a KotOR path file (.pth)"
 
     filename_ext = ".pth"
 

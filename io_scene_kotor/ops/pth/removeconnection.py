@@ -24,12 +24,17 @@ from ...utils import is_path_point
 class KB_OT_delete_path_connection(bpy.types.Operator):
     bl_idname = "kb.remove_path_connection"
     bl_label = "Remove KotOR Path Connection"
+    bl_description = "Remove the selected connection from this path point"
 
     @classmethod
     def poll(cls, context):
-        return is_path_point(context.object) and (
-            len(context.object.kb.path_connection_list) > 0
-        )
+        if not is_path_point(context.object):
+            cls.poll_message_set(context, "Select a KotOR path point object")
+            return False
+        if len(context.object.kb.path_connection_list) == 0:
+            cls.poll_message_set(context, "Path point has no connections to remove")
+            return False
+        return True
 
     def execute(self, context):
         context.object.kb.path_connection_list.remove(

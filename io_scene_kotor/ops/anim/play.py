@@ -16,27 +16,31 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
+from typing import ClassVar
 import bpy
 
 from ...utils import is_mdl_root
 
 
 class KB_OT_play_animation(bpy.types.Operator):
-    bl_idname = "kb.play_animation"
-    bl_label = "Set start and end frame of the scene to this animation"
+    bl_idname: ClassVar[str] = "kb.play_animation"
+    bl_label: ClassVar[str] = "Set start and end frame of the scene to this animation"
+    bl_description: ClassVar[str] = "Set the scene's frame range to match the selected animation for playback"
 
     @classmethod
-    def poll(cls, context):
+    def poll(cls, context: bpy.types.Context) -> bool:
         obj = context.object
-        if not is_mdl_root(obj):
+        if not obj or not is_mdl_root(obj):
+            cls.poll_message_set(context, "Select a KotOR model object")
             return False
-
         anim_list = obj.kb.anim_list
         anim_list_idx = obj.kb.anim_list_idx
+        if anim_list_idx < 0 or anim_list_idx >= len(anim_list):
+            cls.poll_message_set(context, "Select an animation in the list")
+            return False
+        return True
 
-        return anim_list_idx >= 0 and anim_list_idx < len(anim_list)
-
-    def execute(self, context):
+    def execute(self, context: bpy.types.Context) -> set[str]:
         mdl_root = context.object
         anim_list = mdl_root.kb.anim_list
         anim_list_idx = mdl_root.kb.anim_list_idx
