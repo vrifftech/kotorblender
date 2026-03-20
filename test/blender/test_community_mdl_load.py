@@ -5,7 +5,7 @@ Ensures KotorBlender supports both:
 - Unfixed community models (BINS.zip) in test/test_files/unfixed/
 - Fixed community models (converted.rar) in test/test_files/fixed/converted/
 
-All listed MDLs must load. Skips gracefully if test_files or assets are missing (CI-friendly).
+All listed MDLs must load. Fails if test_files/fixed or test_files/unfixed have no MDL+MDX pairs.
 
 Run with:
     blender --background --python test/blender/test_community_mdl_load.py
@@ -107,8 +107,8 @@ def test_load_all_fixed_mdls() -> bool:
     """Load each fixed community MDL; assert at least one MDLROOT, node count > 0, and root name."""
     paths = list(_fixed_mdl_paths())
     if not paths:
-        print("  SKIP test_load_all_fixed_mdls (no test_files/fixed MDL+MDX pairs)")
-        return True
+        print("  FAIL test_load_all_fixed_mdls (no test_files/fixed MDL+MDX pairs; add fixed/converted assets)")
+        return False
 
     all_ok = True
     for mdl_path, name in paths:
@@ -144,8 +144,8 @@ def test_fixed_mdls_have_mesh_or_dummy() -> bool:
     """Each fixed MDL load yields at least one MESH or multiple objects (geometry or hierarchy)."""
     paths = list(_fixed_mdl_paths())
     if not paths:
-        print("  SKIP test_fixed_mdls_have_mesh_or_dummy (no test_files/fixed MDL+MDX pairs)")
-        return True
+        print("  FAIL test_fixed_mdls_have_mesh_or_dummy (no test_files/fixed MDL+MDX pairs)")
+        return False
 
     all_ok = True
     for mdl_path, name in paths:
@@ -180,8 +180,8 @@ def test_fixed_mdl_roundtrip_each() -> bool:
 
     paths = list(_fixed_mdl_paths())
     if not paths:
-        print("  SKIP test_fixed_mdl_roundtrip_each (no test_files/fixed MDL+MDX pairs)")
-        return True
+        print("  FAIL test_fixed_mdl_roundtrip_each (no test_files/fixed MDL+MDX pairs)")
+        return False
 
     all_ok = True
     for mdl_path, name in paths:
@@ -235,8 +235,8 @@ def test_load_all_unfixed_mdls() -> bool:
     expects K2 layout), test fails so we extend the reader; no silent skip."""
     paths = list(_unfixed_mdl_paths())
     if not paths:
-        print("  SKIP test_load_all_unfixed_mdls (no test_files/unfixed MDL+MDX pairs)")
-        return True
+        print("  FAIL test_load_all_unfixed_mdls (no test_files/unfixed MDL+MDX pairs; add unfixed assets)")
+        return False
 
     all_ok = True
     for mdl_path, name in paths:
@@ -278,9 +278,10 @@ def run_tests() -> bool:
     fixed_paths = list(_fixed_mdl_paths())
     unfixed_paths = list(_unfixed_mdl_paths())
     if not fixed_paths and not unfixed_paths:
-        print("  No test_files/fixed or unfixed MDL+MDX pairs found; skipping (CI-friendly).")
-        print("[OK] 0/0 passed (skipped)\n")
-        return True
+        print("  FAIL: No test_files/fixed or unfixed MDL+MDX pairs found.")
+        print("  Add test_files/fixed/converted/ and test_files/unfixed/ (see test/test_files/README.md).")
+        print("[FAIL] 0/4 passed in test_community_mdl_load.py\n")
+        return False
 
     results: list[bool] = [
         test_load_all_fixed_mdls(),

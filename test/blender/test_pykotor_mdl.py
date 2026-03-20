@@ -3,8 +3,8 @@ test_pykotor_mdl.py – Blender background-mode test (PyKotor MDL assertions por
 
 Ports the same assertions as PyKotor test_mdl.py: load binary MDL/MDX, root and
 node hierarchy, mesh data, round-trip, edge cases. Uses test_files/pykotor_mdl/
-(c_dewback, dor_lhr02, m02aa_09b, m12aa_c03_char02, m12aa_c04_cam). Skips
-gracefully if that directory is empty or missing.
+(c_dewback, dor_lhr02, m02aa_09b, m12aa_c03_char02, m12aa_c04_cam). Fails
+if that directory is empty or missing or any listed file fails to load/roundtrip.
 
 Run with:
     blender --background --python test/blender/test_pykotor_mdl.py
@@ -110,8 +110,8 @@ def test_read_mdl_basic():
     """Load one PyKotor test MDL; assert MDL root and name (mirror test_read_mdl_basic)."""
     p = _first_loadable_path()
     if not p:
-        print("  SKIP test_read_mdl_basic (no pykotor_mdl assets or none loadable)")
-        return True
+        print("  FAIL test_read_mdl_basic (no pykotor_mdl assets or none loadable)")
+        return False
     mdl_path, name = p
     _clear_scene()
     load_mdl(_op, mdl_path, _import_opts())
@@ -128,8 +128,8 @@ def test_read_all_test_files():
     """Load every PyKotor test file; assert root and type. All must pass (no skips)."""
     paths = list(_pykotor_mdl_paths() or [])
     if not paths:
-        print("  SKIP test_read_all_test_files (no pykotor_mdl assets)")
-        return True
+        print("  FAIL test_read_all_test_files (no pykotor_mdl assets)")
+        return False
     all_ok = True
     for mdl_path, name in paths:
         _clear_scene()
@@ -151,8 +151,8 @@ def test_mdl_node_hierarchy():
     """After load, assert at least one node and root in objects (mirror test_mdl_node_hierarchy)."""
     p = _first_loadable_path()
     if not p:
-        print("  SKIP test_mdl_node_hierarchy (no pykotor_mdl assets or none loadable)")
-        return True
+        print("  FAIL test_mdl_node_hierarchy (no pykotor_mdl assets or none loadable)")
+        return False
     mdl_path, name = p
     _clear_scene()
     load_mdl(_op, mdl_path, _import_opts())
@@ -174,8 +174,8 @@ def test_mdl_mesh_data():
     """After load, assert at least one object with mesh data (mirror test_mdl_mesh_data)."""
     p = _first_loadable_path()
     if not p:
-        print("  SKIP test_mdl_mesh_data (no pykotor_mdl assets or none loadable)")
-        return True
+        print("  FAIL test_mdl_mesh_data (no pykotor_mdl assets or none loadable)")
+        return False
     mdl_path, name = p
     _clear_scene()
     load_mdl(_op, mdl_path, _import_opts())
@@ -192,8 +192,8 @@ def test_mdl_roundtrip():
     """Load MDL, save to temp, load again; assert root preserved (mirror round-trip intent)."""
     p = _first_loadable_path()
     if not p:
-        print("  SKIP test_mdl_roundtrip (no pykotor_mdl assets or none loadable)")
-        return True
+        print("  FAIL test_mdl_roundtrip (no pykotor_mdl assets or none loadable)")
+        return False
     mdl_path, name = p
     _clear_scene()
     with tempfile.NamedTemporaryFile(suffix=".mdl", delete=False) as f:
@@ -232,8 +232,8 @@ def test_mdl_get_node_by_name():
     """Get root by name; nonexistent name returns no object (mirror test_mdl_get_node_by_name)."""
     p = _first_loadable_path()
     if not p:
-        print("  SKIP test_mdl_get_node_by_name (no pykotor_mdl assets or none loadable)")
-        return True
+        print("  FAIL test_mdl_get_node_by_name (no pykotor_mdl assets or none loadable)")
+        return False
     mdl_path, name = p
     _clear_scene()
     load_mdl(_op, mdl_path, _import_opts())
@@ -257,8 +257,8 @@ def test_mdl_textures():
     """After load, texture/material names are strings (mirror test_mdl_textures)."""
     p = _first_loadable_path()
     if not p:
-        print("  SKIP test_mdl_textures (no pykotor_mdl assets or none loadable)")
-        return True
+        print("  FAIL test_mdl_textures (no pykotor_mdl assets or none loadable)")
+        return False
     mdl_path, name = p
     _clear_scene()
     load_mdl(_op, mdl_path, _import_opts())
@@ -286,8 +286,8 @@ def test_mdl_lightmaps():
     """After load, lightmap/material slots exist; names are strings if present (mirror test_mdl_lightmaps)."""
     p = _first_loadable_path()
     if not p:
-        print("  SKIP test_mdl_lightmaps (no pykotor_mdl assets or none loadable)")
-        return True
+        print("  FAIL test_mdl_lightmaps (no pykotor_mdl assets or none loadable)")
+        return False
     mdl_path, name = p
     _clear_scene()
     load_mdl(_op, mdl_path, _import_opts())
@@ -315,8 +315,8 @@ def test_write_mdl_binary():
     """Load, save to binary file; assert file exists and has header (mirror test_write_mdl_binary)."""
     p = _first_loadable_path()
     if not p:
-        print("  SKIP test_write_mdl_binary (no pykotor_mdl assets or none loadable)")
-        return True
+        print("  FAIL test_write_mdl_binary (no pykotor_mdl assets or none loadable)")
+        return False
     mdl_path, name = p
     _clear_scene()
     load_mdl(_op, mdl_path, _import_opts())
@@ -347,8 +347,8 @@ def test_mdl_roundtrip_node_count():
     """Roundtrip preserves node count (mirror PyKotor roundtrip structure)."""
     p = _first_loadable_path()
     if not p:
-        print("  SKIP test_mdl_roundtrip_node_count (no pykotor_mdl assets or none loadable)")
-        return True
+        print("  FAIL test_mdl_roundtrip_node_count (no pykotor_mdl assets or none loadable)")
+        return False
     mdl_path, name = p
     _clear_scene()
     load_mdl(_op, mdl_path, _import_opts())
@@ -387,8 +387,8 @@ def test_mdl_roundtrip_each_loadable():
     """Roundtrip every loadable PyKotor model; assert root name and at least one node (exhaustive)."""
     paths = list(_pykotor_mdl_paths() or [])
     if not paths:
-        print("  SKIP test_mdl_roundtrip_each_loadable (no pykotor_mdl assets)")
-        return True
+        print("  FAIL test_mdl_roundtrip_each_loadable (no pykotor_mdl assets)")
+        return False
     all_ok = True
     for mdl_path, name in paths:
         _clear_scene()
@@ -500,8 +500,8 @@ def test_mdl_find_parent():
     """After load, root has no parent; at least one child's parent is root (mirror test_mdl_find_parent)."""
     p = _first_loadable_path()
     if not p:
-        print("  SKIP test_mdl_find_parent (no pykotor_mdl assets or none loadable)")
-        return True
+        print("  FAIL test_mdl_find_parent (no pykotor_mdl assets or none loadable)")
+        return False
     mdl_path, name = p
     _clear_scene()
     load_mdl(_op, mdl_path, _import_opts())
@@ -526,8 +526,8 @@ def _roundtrip_by_type(basename: str) -> bool:
     mdl_path = os.path.join(pykotor_dir, basename + ".mdl")
     mdx_path = os.path.join(pykotor_dir, basename + ".mdx")
     if not os.path.isfile(mdl_path) or not os.path.isfile(mdx_path):
-        print(f"  SKIP test_roundtrip_{basename} (file missing)")
-        return True
+        print(f"  FAIL test_roundtrip_{basename} (file missing: {basename}.mdl/.mdx)")
+        return False
     _clear_scene()
     try:
         load_mdl(_op, mdl_path, _import_opts())
@@ -599,9 +599,9 @@ def run_tests():
     print("\n=== test_pykotor_mdl.py ===")
     paths = list(_pykotor_mdl_paths() or [])
     if not paths:
-        print("  No test_files/pykotor_mdl MDL+MDX pairs; skipping (CI-friendly).")
-        print("[OK] 0/0 passed (skipped)\n")
-        return True
+        print("  FAIL: No test_files/pykotor_mdl MDL+MDX pairs (see test/test_files/pykotor_mdl/README.md).")
+        print("[FAIL] 0 passed in test_pykotor_mdl.py\n")
+        return False
 
     tests = [
         test_read_mdl_basic,

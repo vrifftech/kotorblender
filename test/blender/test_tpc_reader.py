@@ -3,8 +3,6 @@ test_tpc_reader.py – Blender background-mode test (TPC format)
 
 Ports equivalent behaviour of PyKotor test_texture_loader_core: verifies TPC
 reader can load a minimal uncompressed texture and produce expected dimensions.
-No OpenGL or Qt. Camera/frustum tests from PyKotor gl/ are out of scope (see
-test_gl_placeholder.py).
 
 Run with:
     blender --background --python test/blender/test_tpc_reader.py

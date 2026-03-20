@@ -22,7 +22,7 @@ If this directory is missing or you need to refresh assets:
 2. Extract BINS.zip into `unfixed/`.
 3. Extract converted.rar into `fixed/` (e.g. with WinRAR, 7-Zip, or Python `rarfile` + `unrar` on PATH).
 
-Game/mod binaries may be proprietary. If you cannot commit them, use skip-when-missing in tests and set `DATA_DIR` or re-extract locally as needed.
+Game/mod binaries may be proprietary. The test suite does **not** skip when assets are missing: if `fixed/` or `unfixed/` (or `pykotor_mdl/`) are empty or missing, the corresponding tests **fail** with a clear message so you can add or re-extract assets (see above).
 
 ## Diagnosing reader strictness (unfixed vs fixed)
 
