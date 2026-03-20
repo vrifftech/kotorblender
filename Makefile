@@ -12,7 +12,7 @@
 #   test-aabb          test-constants      test-mdl
 
 .PHONY: build test test-e2e test-unit lint syntax-check clean
-.PHONY: test-registration test-gff test-pth test-lyt test-aabb test-constants test-mdl test-community-mdl
+.PHONY: test-registration test-gff test-pth test-lyt test-aabb test-constants test-mdl test-mdl-import-op test-community-mdl
 
 BLENDER ?= blender
 
@@ -49,6 +49,9 @@ test-constants:
 
 test-mdl:
 	$(BLENDER) --background --python test/blender/test_mdl_minimal.py
+
+test-mdl-import-op:
+	$(BLENDER) --background --python test/blender/test_mdl_import_op.py
 
 test-community-mdl:
 	$(BLENDER) --background --python test/blender/test_community_mdl_load.py

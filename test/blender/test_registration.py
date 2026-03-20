@@ -242,14 +242,23 @@ def test_image_kb_properties():
 
 
 def test_addon_preferences():
-    """Add-on preferences are accessible and have expected string fields."""
+    """Add-on preferences are accessible and resolve through the same path as MDL/LYT import (semicolon_separated_to_absolute_paths)."""
     try:
         prefs = bpy.context.preferences.addons.get(MODULE)
         if prefs is None:
             print("  FAIL test_addon_preferences: module not in addons")
             return False
-        _ = prefs.preferences.texture_search_paths
-        _ = prefs.preferences.lightmap_search_paths
+        # Same pipeline as ops/mdl/importop.execute: pass prefs into semicolon_separated_to_absolute_paths
+        # (would raise AttributeError if prefs were _PropertyDeferred and code did not coerce to str)
+        from io_scene_kotor.utils import semicolon_separated_to_absolute_paths
+
+        working_dir = os.path.dirname(os.path.abspath(__file__))
+        _ = semicolon_separated_to_absolute_paths(
+            prefs.preferences.texture_search_paths, working_dir
+        )
+        _ = semicolon_separated_to_absolute_paths(
+            prefs.preferences.lightmap_search_paths, working_dir
+        )
         print("  PASS test_addon_preferences")
         return True
     except AttributeError as e:
