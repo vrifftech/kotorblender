@@ -128,3 +128,8 @@ class ExportOptions:
         self.export_animations = True
         self.export_walkmeshes = True
         self.compress_quaternions = False
+
+class Game:
+    K1 = "K1"
+    TSL = "TSL"
+    JADE = "JADE"
