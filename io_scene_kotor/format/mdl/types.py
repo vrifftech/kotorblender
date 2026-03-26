@@ -271,3 +271,25 @@ class ControllerKey:
         self.timekeys_start = timekeys_start
         self.values_start = values_start
         self.num_columns = num_columns
+
+
+
+@dataclass
+class JadeHeader:
+    version: int
+    mdl_size: int
+    mdx_size_vertices: int
+    mdx_size_faces: int
+    mdx_size_extra: int
+
+@dataclass
+class JadeMeshHeader:
+    texture: str
+    index_count: int
+    face_offset_mdl: int
+    mesh_type: int
+    mdx_struct_size: int
+    off_normals: int
+    off_uv: tuple[int, int, int, int]
+    vertex_count: int
+    face_offset_mdx: int
